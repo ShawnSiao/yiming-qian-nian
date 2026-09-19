@@ -112,9 +112,12 @@
       { name: "bottom", bells: model.BELLS.filter((bell) => bell.row === "bottom"), y: height * .68, height: height * .28 }
     ];
     rows.forEach((row) => {
-      const usable = width - 58; const gap = 5; const bellWidth = (usable - gap * 3) / 4;
+      const sideMargin = 29; const gap = 5;
+      const fitWidth = (width - sideMargin * 2 - gap * 3) / 4;
+      const bellWidth = Math.max(26, Math.min(fitWidth, row.height * 0.85));
+      const offsetX = (width - (bellWidth * 4 + gap * 3)) / 2;
       row.bells.forEach((bell, index) => {
-        const x = 29 + index * (bellWidth + gap);
+        const x = offsetX + index * (bellWidth + gap);
         const polygon = [[x+bellWidth*.36,row.y],[x+bellWidth*.64,row.y],[x+bellWidth*.76,row.y+row.height*.16],[x+bellWidth*.98,row.y+row.height*.88],[x+bellWidth*.84,row.y+row.height],[x+bellWidth*.16,row.y+row.height],[x+bellWidth*.02,row.y+row.height*.88],[x+bellWidth*.24,row.y+row.height*.16]];
         layouts.push({ bell, x, y: row.y, width: bellWidth, height: row.height, polygon, row: row.name });
       });
@@ -268,7 +271,7 @@
   function scheduleSystemEvent(event,delay,stage){const layoutInfo=model.resolveNoteLayout(event.midi);if(!layoutInfo)return;const layout=stage.layouts.find((item)=>item.bell.id===layoutInfo.bellId);if(!layout)return;const wait=Math.max(0,delay);playbackTimers.push(setTimeout(()=>{stage.target={...layoutInfo,zone:layoutInfo.zone};strike({layout,zone:layoutInfo.zone,x:layout.x+layout.width*(layoutInfo.zone==="center"?.5:.18),y:layout.y+layout.height*.58},stage,"system",event.midi,event.velocity);playbackTimers.push(setTimeout(()=>{if(stage.target&&stage.target.bellId===layoutInfo.bellId)stage.target=null;},Math.max(260,event.durationBeat*60000/(selectedSong?.bpm||82)/LISTEN_RATE*.72)));},wait));}
 
   let followRotateHinted=false;
-  function hintFollowRotate(){if(followRotateHinted)return;followRotateHinted=true;toast("浏览器不允许网页锁定方向，请手动横屏，编钟会铺满");}
+  function hintFollowRotate(){if(followRotateHinted)return;followRotateHinted=true;const media=window.matchMedia;if(!media||!media("(pointer:coarse)").matches||!media("(orientation:portrait)").matches)return;toast("浏览器不允许网页锁定方向，请手动横屏，编钟会铺满");}
   function enterFollowLandscape(){document.body.classList.add("follow-landscape");const orientation=window.screen&&window.screen.orientation;if(orientation&&typeof orientation.lock==="function")Promise.resolve(orientation.lock("landscape")).catch(hintFollowRotate);else hintFollowRotate();window.setTimeout(resizeAll,40);}
   function leaveFollowLandscape(){document.body.classList.remove("follow-landscape");const orientation=window.screen&&window.screen.orientation;if(orientation&&typeof orientation.unlock==="function")orientation.unlock();window.setTimeout(resizeAll,40);}
   function startFollow(song){closeSongSheet();stopListening();selectedSong=song;const beatMs=60000/song.bpm/FOLLOW_RATE;follow={song,index:0,attempts:[],startedAt:performance.now()+beatMs*4,beatMs,lastBeat:-1,paused:false,pauseAt:0,originalMode:settings.tuningMode};setMode(song.mode);elements.followTitle.textContent=song.title;elements.judgement.textContent="四拍预备 · 跟着节拍光点落槌";enterFollowLandscape();openView("follow");updateFutureNotes();updateBeatIndicator(-1);requestRender();}
@@ -314,8 +317,24 @@
 
   if(window.visualViewport)window.visualViewport.addEventListener("resize",scheduleResize);
   window.addEventListener("orientationchange",()=>window.setTimeout(setAppHeight,120));
+  const KEY_ROWS = [["1","2","3","4"],["q","w","e","r"],["a","s","d","f"]];
+  const KEY_ROW_NAMES = ["top","middle","bottom"];
+  function isTypingTarget(node){return !!node&&(node.tagName==="INPUT"||node.tagName==="TEXTAREA"||node.isContentEditable);}
+  function handleKeyDown(event){
+    if(event.repeat||event.metaKey||event.ctrlKey||event.altKey||isTypingTarget(event.target))return;
+    if(currentView!=="play")return;
+    const key=typeof event.key==="string"&&event.key.length===1?event.key.toLowerCase():"";
+    if(!key)return;
+    const rowIndex=KEY_ROWS.findIndex((row)=>row.includes(key));
+    if(rowIndex<0)return;
+    const layout=mainStage.layouts.filter((item)=>item.row===KEY_ROW_NAMES[rowIndex])[KEY_ROWS[rowIndex].indexOf(key)];
+    if(!layout)return;
+    event.preventDefault();
+    const zone=event.shiftKey?"side":"center";
+    strike({layout,zone,x:layout.x+layout.width*(zone==="center"?.5:.18),y:layout.y+layout.height*.58},mainStage,"user");
+  }
+  document.addEventListener("keydown",handleKeyDown);
   document.addEventListener("gesturestart",(event)=>event.preventDefault(),{passive:false});
-  document.getElementById("wide-note-close").addEventListener("click",()=>{document.getElementById("wide-note").hidden=true;});
 
   setAppHeight();applySettings();renderSongs("全部");renderWorks();
 })();

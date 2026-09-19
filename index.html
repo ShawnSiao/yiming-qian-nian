@@ -24,7 +24,6 @@
 <body>
   <noscript><div class="noscript-note">掌上编钟使用浏览器实时合成钟声，需要开启 JavaScript 才能发声。</div></noscript>
   <main class="app-shell" id="app-shell">
-    <p class="wide-note" id="wide-note"><span>建议用手机竖屏访问，编钟会铺满屏幕；鼠标点击同样可以敲钟。</span><button type="button" id="wide-note-close" aria-label="关闭提示">×</button></p>
     <section class="boot-screen is-active" id="boot-screen" data-screen-label="启钟页" aria-labelledby="boot-title">
       <div class="boot-copy"><p class="eyebrow">先秦礼乐 · 数字演奏</p><h1 id="boot-title">一鸣千年</h1><p>轻触不同钟面，先听一钟双音</p></div>
       <button class="boot-bell" id="boot-bell" type="button" aria-label="体验一钟双音，中央为正鼓 C4，两侧为侧鼓 E4"><img src="./assets/images/bell-medium-v2.webp" alt="合瓦形编钟"><span class="boot-tone boot-tone-side boot-tone-left">E4</span><span class="boot-tone boot-tone-center">C4</span><span class="boot-tone boot-tone-side boot-tone-right">E4</span></button>
@@ -40,6 +39,7 @@
         <section class="instrument-wrap" aria-label="三层十二件数字编钟"><canvas id="rack-canvas" aria-hidden="true"></canvas><canvas id="bell-canvas" tabindex="0" aria-label="可多点敲击的数字编钟，钟体中央为正鼓，两侧为侧鼓"></canvas><div class="first-guide" id="first-guide" hidden><span>轻触钟面，听一声金石</span></div></section>
         <div class="note-readout" id="note-readout" aria-live="polite"><span class="note-label">此刻钟音</span><strong id="note-name">静候落槌</strong><span id="note-pitch">中央为正鼓 · 两侧为侧鼓</span><span class="sound-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><i class="note-resonance" aria-hidden="true"></i></div>
         <div class="play-controls"><button class="quiet-button" id="labels-button" type="button">音名 开</button><button class="record-button" id="record-button" type="button"><span aria-hidden="true">●</span> 录钟曲</button><button class="quiet-button" data-open-view="culture" type="button">礼乐小识</button></div>
+        <p class="keyboard-hint">键盘也能敲钟：<b>1–4</b> 上层 · <b>Q W E R</b> 中层 · <b>A S D F</b> 下层；按住 <b>Shift</b> 敲侧鼓。</p>
       </section>
 
       <section class="view scroll-view" data-view="library" data-screen-label="乐谱" hidden>
