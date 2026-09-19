@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#101210">
+  <meta name="description" content="一鸣千年·掌上编钟：轻触钟面不同位置，听一口钟的正鼓与侧鼓双音。纯前端离线合成音色，手机浏览器直接演奏，无需安装。">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="一鸣千年">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no,email=no,address=no">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="一鸣千年·掌上编钟">
+  <meta property="og:description" content="轻触不同钟面，听一钟双音；六首曲谱可先听再跟奏。">
+  <meta property="og:image" content="https://shawnsiao.github.io/yiming-qian-nian/icon.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>一鸣千年·掌上编钟</title>
+  <link rel="icon" href="./icon.png">
+  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <noscript><div class="noscript-note">掌上编钟使用浏览器实时合成钟声，需要开启 JavaScript 才能发声。</div></noscript>
+  <main class="app-shell" id="app-shell">
+    <p class="wide-note" id="wide-note"><span>建议用手机竖屏访问，编钟会铺满屏幕；鼠标点击同样可以敲钟。</span><button type="button" id="wide-note-close" aria-label="关闭提示">×</button></p>
+    <section class="boot-screen is-active" id="boot-screen" data-screen-label="启钟页" aria-labelledby="boot-title">
+      <div class="boot-copy"><p class="eyebrow">先秦礼乐 · 数字演奏</p><h1 id="boot-title">一鸣千年</h1><p>轻触不同钟面，先听一钟双音</p></div>
+      <button class="boot-bell" id="boot-bell" type="button" aria-label="体验一钟双音，中央为正鼓 C4，两侧为侧鼓 E4"><img src="./assets/images/bell-medium-v2.webp" alt="合瓦形编钟"><span class="boot-tone boot-tone-side boot-tone-left">E4</span><span class="boot-tone boot-tone-center">C4</span><span class="boot-tone boot-tone-side boot-tone-right">E4</span></button>
+      <p class="boot-note" id="boot-note" aria-live="polite">轻触钟面不同位置试听</p>
+      <div class="boot-lessons" aria-label="编钟入门教学"><article><b>壹</b><span><strong>一钟双音</strong></span></article><article><b>贰</b><span><strong>十二钟廿四音</strong></span></article><article><b>叁</b><span><strong>先听再跟奏</strong></span></article></div>
+      <div class="boot-action"><button class="button primary-button button--primary" id="unlock-audio" type="button">进入编钟演奏</button><p class="boot-status" id="boot-status" role="status" hidden></p></div>
+    </section>
+
+    <section class="app-screen" id="main-app" hidden>
+      <section class="view play-view is-active" data-view="play" data-screen-label="自由演奏">
+        <header class="topbar play-topbar"><div><p class="eyebrow">数字编钟演奏</p><h2>一鸣千年</h2></div><button class="mode-button" id="mode-button" type="button" aria-expanded="false">五声易奏</button></header>
+        <div class="mode-menu" id="mode-menu" hidden><button type="button" data-mode="pentatonic"><strong>五声易奏</strong><span>随手敲也更容易成曲</span></button><button type="button" data-mode="chromatic"><strong>全律演奏</strong><span>开放完整十二音</span></button></div>
+        <section class="instrument-wrap" aria-label="三层十二件数字编钟"><canvas id="rack-canvas" aria-hidden="true"></canvas><canvas id="bell-canvas" tabindex="0" aria-label="可多点敲击的数字编钟，钟体中央为正鼓，两侧为侧鼓"></canvas><div class="first-guide" id="first-guide" hidden><span>轻触钟面，听一声金石</span></div></section>
+        <div class="note-readout" id="note-readout" aria-live="polite"><span class="note-label">此刻钟音</span><strong id="note-name">静候落槌</strong><span id="note-pitch">中央为正鼓 · 两侧为侧鼓</span><span class="sound-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><i class="note-resonance" aria-hidden="true"></i></div>
+        <div class="play-controls"><button class="quiet-button" id="labels-button" type="button">音名 开</button><button class="record-button" id="record-button" type="button"><span aria-hidden="true">●</span> 录钟曲</button><button class="quiet-button" data-open-view="culture" type="button">礼乐小识</button></div>
+      </section>
+
+      <section class="view scroll-view" data-view="library" data-screen-label="乐谱" hidden>
+        <header class="topbar"><div><p class="eyebrow">六首本地曲目</p><h2>乐谱</h2></div><button class="icon-button" data-open-view="culture" type="button" aria-label="查看礼乐小识">礼</button></header>
+        <div class="page-intro"><h3>听一遍，再从容跟奏</h3><p>试听与跟奏保持曲谱原有拍位，分别以 0.90×、0.72× 舒缓呈现。</p></div>
+        <div class="filter-row" id="category-filter" aria-label="曲目分类"><button class="is-active" type="button" data-category="全部">全部</button><button type="button" data-category="入门">入门</button><button type="button" data-category="民间">民间</button><button type="button" data-category="熟悉旋律">熟悉旋律</button></div>
+        <div class="song-list" id="song-list"></div>
+      </section>
+
+      <section class="view scroll-view" data-view="works" data-screen-label="我的钟曲" hidden>
+        <header class="topbar"><div><p class="eyebrow">当前设备本地记录</p><h2>我的钟曲</h2></div><button class="icon-button settings-button" id="open-settings" type="button" aria-label="打开演奏设置">⚙️</button></header>
+        <div class="local-note"><strong>只记录敲钟事件</strong><span>换机、卸载或清理数据后可能丢失，不会使用麦克风。</span></div>
+        <div class="works-summary"><strong id="works-count">0</strong><span>首作品，最多保存 30 首</span></div><div class="works-list" id="works-list"></div>
+      </section>
+
+      <section class="view scroll-view overlay-view" data-view="culture" data-screen-label="礼乐小识" hidden>
+        <header class="topbar"><button class="icon-button" data-back type="button" aria-label="返回">‹</button><h2>礼乐小识</h2><span class="topbar-space"></span></header>
+        <section class="knowledge-hero"><button class="knowledge-bell" id="knowledge-bell" type="button" aria-label="轻触编钟试听正鼓 C4 与侧鼓 E4"><img src="./assets/images/bell-medium-v2.webp" alt="合瓦形先秦编钟造型"><span class="knowledge-zone knowledge-zone-side">侧鼓 E4</span><span class="knowledge-zone knowledge-zone-center">正鼓 C4</span><i class="knowledge-wave" aria-hidden="true"></i></button><div><p class="eyebrow">一钟双音</p><h3>同一口钟，两个击音</h3><p>轻触钟面不同部位，直接听辨音色与音高。</p><div class="tone-pair"><button type="button" data-demo-midi="60" data-demo-zone="正鼓"><span>正鼓</span><strong>C4</strong></button><button type="button" data-demo-midi="64" data-demo-zone="侧鼓"><span>侧鼓</span><strong>E4</strong></button></div></div><p class="culture-hit" id="culture-hit" aria-live="polite"><span class="mini-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>轻触钟面试听</p></section>
+        <article class="knowledge-chapter"><p class="chapter-index">01 · 器形为何重要</p><h3>合瓦形钟腔，不是圆钟</h3><p>钟体横截面呈合瓦形，配合枚、篆、鼓部等结构，使同一器物能够在不同位置产生可用于演奏的双音。正鼓位于钟体中央区域，侧鼓位于两侧区域。</p></article>
+        <article class="knowledge-chapter"><p class="chapter-index">02 · 一套完整乐器</p><h3>三层钟架，覆盖宽广音域</h3><p>曾侯乙编钟由不同大小、音区与用途的钟组成整套乐器，需要多人协作演奏。</p><div class="fact-row"><span><strong>65 件</strong><small>整套钟体</small></span><span><strong>三层八组</strong><small>钟架组织</small></span><span><strong>五个半八度</strong><small>整体音域</small></span></div></article>
+        <article class="knowledge-chapter"><p class="chapter-index">03 · 听音与落槌</p><h3>看准击点，再听余韵</h3><p>正鼓位于钟体中央，音色较浑厚；侧鼓位于钟体两侧，音色更清亮。演奏时先辨认音名，再跟随声纹和光圈落槌。</p></article>
+      </section>
+
+      <section class="view follow-view" data-view="follow" data-screen-label="曲谱跟奏" hidden>
+        <header class="follow-header"><div><strong id="follow-title">跟奏</strong><span id="follow-progress">0/0</span></div></header>
+        <div class="progress-track"><span id="follow-progress-bar"></span></div><div class="future-notes" id="future-notes" aria-label="未来三个音"></div><div class="follow-beat" id="follow-beat" aria-label="四拍节奏提示"><i></i><i></i><i></i><i></i></div>
+        <section class="follow-stage"><canvas id="follow-rack-canvas" aria-hidden="true"></canvas><canvas id="follow-canvas" aria-label="跟奏编钟"></canvas></section><div class="follow-safe-actions"><button class="icon-button" id="exit-follow" type="button" aria-label="退出跟奏">退出</button><button class="icon-button" id="pause-follow" type="button" aria-label="暂停跟奏">暂停</button></div><div class="judgement" id="judgement">看准亮起的钟，轻触对应位置</div>
+      </section>
+
+      <section class="view result-view" data-view="result" data-screen-label="演奏结果" hidden>
+        <p class="eyebrow">本次跟奏</p><h2 id="result-rating">再奏一曲</h2><strong class="result-score" id="result-score">0</strong>
+        <dl class="result-grid"><div><dt>音符准确</dt><dd id="result-notes">0%</dd></div><div><dt>节奏合律</dt><dd id="result-rhythm">0%</dd></div><div><dt>最长连奏</dt><dd id="result-streak">0</dd></div></dl>
+        <button class="button primary-button" id="retry-song" type="button">再奏一遍</button><button class="button quiet-wide" data-open-view="library" type="button">返回乐谱</button>
+      </section>
+
+      <nav class="bottom-nav" id="bottom-nav" aria-label="主要导航"><button class="is-active" type="button" data-open-view="play"><span aria-hidden="true">钟</span>奏钟</button><button type="button" data-open-view="library"><span aria-hidden="true">谱</span>乐谱</button><button type="button" data-open-view="works"><span aria-hidden="true">曲</span>我的</button></nav>
+    </section>
+
+    <section class="sheet-layer" id="song-sheet" hidden aria-labelledby="song-sheet-title"><button class="sheet-scrim" type="button" data-close-sheet aria-label="关闭曲目详情"></button><div class="bottom-sheet"><span class="grabber" aria-hidden="true"></span><p class="eyebrow" id="song-sheet-category">曲目</p><h2 id="song-sheet-title">曲目</h2><p id="song-sheet-description"></p><div class="song-facts" id="song-sheet-facts"></div><div class="sheet-actions"><button class="button secondary-button" id="listen-song" type="button">听一遍</button><button class="button primary-button" id="follow-song" type="button">跟着敲</button></div></div></section>
+    <section class="sheet-layer" id="record-sheet" hidden aria-labelledby="record-sheet-title"><button class="sheet-scrim" type="button" data-close-record aria-label="关闭录制结果"></button><div class="bottom-sheet"><span class="grabber" aria-hidden="true"></span><p class="eyebrow">本地事件记录</p><h2 id="record-sheet-title">这一段钟声已记录</h2><div class="record-stats"><span id="record-duration">00:00</span><span id="record-count">0 次敲击</span></div><label class="field-label" for="work-title">名称</label><input class="text-field" id="work-title" maxlength="20" value="我的钟曲 01"><p class="field-error" id="work-error" role="alert"></p><button class="button primary-button" id="save-work" type="button">保存到当前设备</button><div class="inline-actions"><button type="button" id="preview-recording">再奏一遍</button><button type="button" id="discard-recording">重录</button></div></div></section>
+    <section class="sheet-layer" id="settings-sheet" hidden aria-labelledby="settings-title"><button class="sheet-scrim" type="button" data-close-settings aria-label="关闭设置"></button><div class="bottom-sheet settings-sheet"><span class="grabber" aria-hidden="true"></span><h2 id="settings-title">演奏设置</h2><label class="range-row"><span>主音量</span><input id="volume-range" type="range" min="0" max="100" value="78"></label><label class="toggle-row"><span><strong>显示音名</strong><small>敲击后显示现代音名与五声唱名</small></span><input id="show-labels-toggle" type="checkbox" checked></label><label class="toggle-row"><span><strong>低动效</strong><small>减少摆动、波纹与金色细尘</small></span><input id="reduce-motion-toggle" type="checkbox"></label><button class="button secondary-button" id="replay-tutorial" type="button">再看一次教学</button></div></section>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script src="./assets/bell-model.js"></script><script src="./assets/licensed-songs.js"></script><script src="./assets/songs.js"></script><script src="./assets/audio-engine.js"></script><script src="./assets/app.js"></script>
+</body>
+</html>
