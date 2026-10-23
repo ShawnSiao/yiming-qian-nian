@@ -1,0 +1,9 @@
+{
+  "version": "r14-preview.1",
+  "date": "2026-10-23",
+  "path": "versions/r14/",
+  "status": "public-preview",
+  "features": ["21-bell chromatic performance", "single-bell 3D observation", "resizable score workspace", "larger copper mallet", "short and full-span Zhu Zhi Ci"],
+  "scoreStatus": "Full-span Zhu Zhi Ci is a transcription draft, not an approved score; 54 attacks remain marked for review.",
+  "deviceStatus": "Desktop browser viewport checks completed; real iPhone and Android device acceptance is pending."
+}

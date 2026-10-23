@@ -7,6 +7,8 @@
 
 **在线体验**：<https://shawnsiao.github.io/yiming-qian-nian/>
 
+**R14 试用版**：[新版看谱演奏工作台](https://shawnsiao.github.io/yiming-qian-nian/versions/r14/?view=play&score=zhuzhi-ci-recording)。版本 `r14-preview.1`，包含扩展音域、单钟 3D 观赏、可调曲谱栏及两个版本的《竹枝词》；完整版仍为转谱初稿。[版本说明](versions/r14/README.md)。下文保留旧版使用说明。
+
 ## 怎么玩
 
 1. 打开页面，先轻触**进入编钟演奏**——这一步是在给浏览器授权发声（浏览器的自动播放限制要求必须由用户手势触发）。
@@ -75,7 +77,7 @@ python -m http.server 8000
 # 打开 http://127.0.0.1:8000
 ```
 
-GitHub Pages 直接在 `main` 分支根目录发布，仓库里的 `.nojekyll` 用于跳过 Jekyll 处理。
+GitHub Pages 由 `.github/workflows/pages.yml` 从 `main` 分支测试、构建和部署。`scripts/build-pages.mjs` 只打包旧版静态入口及固定版本的运行资源；旧版首页保持不变，R14 位于 `versions/r14/`。研究照片、源音频 WAV、Blender 工程、分析缓存和测试记录不进入 Pages 产物。
 
 ## 验证
 

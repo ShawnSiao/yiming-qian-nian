@@ -1,0 +1,15 @@
+{
+  "revision": 7,
+  "source": "ensemble-suspension-r6.glb",
+  "meshes": [
+    {"names": ["Bell_C", "Bell_D", "Bell_E", "Bell_F", "Bell_G", "Bell_A", "Bell_B"], "before": 30987, "after": 5577},
+    {"names": ["CopperMallet"], "before": 4572, "after": 1280},
+    {"names": ["RackPost"], "before": 612, "after": 171},
+    {"names": ["RackFoot"], "before": 420, "after": 117},
+    {"names": ["RackBracket"], "before": 572, "after": 160},
+    {"names": ["RackBeam"], "before": 4840, "after": 1355},
+    {"names": ["SuspensionSaddle"], "before": 1392, "after": 389},
+    {"names": ["SuspensionLink", "Hanger"], "before": 1360, "after": 380}
+  ],
+  "bytes": 2485156
+}

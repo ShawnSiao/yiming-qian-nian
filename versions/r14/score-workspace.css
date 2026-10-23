@@ -1,0 +1,66 @@
+/* R14: main's colors and controls, with a resizable reading surface. */
+.prototype[data-view=play]{max-width:none}
+.performance-workspace{grid-row:2;display:grid;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0;position:relative}
+.performance-workspace>.stage-viewport{grid-area:1/1;min-width:0;height:100%}
+.score-panel,.pane-splitter{display:none}
+.compact-score{display:none;min-width:0}
+.score-toggle[aria-pressed=true]{color:var(--gold)}
+.read-score-action{grid-column:1/-1}
+.reading-note{display:grid;grid-template-rows:9px 27px 7px 17px 15px;justify-items:center;align-items:center;min-width:29px;color:var(--dim)}
+.reading-note b{font:600 23px/27px Georgia,serif;position:relative;white-space:nowrap}
+.reading-note i{font:11px/1 sans-serif;font-style:normal;position:absolute;right:-7px;top:-1px;color:var(--gold)}
+.reading-note sup,.reading-note sub{position:static;font:600 16px/8px Georgia,serif}
+.reading-note small{font:11px/16px Georgia,serif;font-variant-numeric:tabular-nums}
+.reading-note em{font:10px/15px -apple-system,"PingFang SC",sans-serif;font-style:normal;color:var(--muted)}
+.reading-note.is-current{color:var(--gold)}
+.reading-note.is-current b{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}
+@media(min-width:1280px){
+  .has-score .performance-workspace{grid-template-columns:minmax(0,1fr) 16px var(--score-pane-width)}
+  .has-score .performance-workspace>.stage-viewport{grid-area:1/1}
+  .has-score .score-panel{grid-area:1/3;display:flex;flex-direction:column;min-height:0;min-width:0;border-block:1px solid var(--line);padding:0 20px;background:var(--ink-soft)}
+  .has-score .pane-splitter{grid-area:1/2;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:col-resize;user-select:none;outline-offset:-4px}
+  .pane-splitter::after{content:'';width:2px;height:42px;background:var(--line);border-radius:1px}
+  .pane-splitter:hover::after,.pane-splitter:focus-visible::after{background:var(--gold)}
+  .pane-splitter[aria-disabled=true]{cursor:default;opacity:.35}
+  .has-score .score-left{grid-template-columns:var(--score-pane-width) 16px minmax(0,1fr)}
+  .has-score .score-left>.stage-viewport{grid-area:1/3}
+  .has-score .score-left>.score-panel{grid-area:1/1}
+  .score-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:62px}
+  .score-panel-heading h2{font:600 20px "Songti SC",STSong,serif}
+  .score-panel-heading .quiet-button{font-size:12px;padding:0 6px}
+  .score-panel select{width:100%;min-height:44px;padding:0 10px;background:var(--ink);border:1px solid var(--line);border-radius:3px;font-size:15px;text-overflow:ellipsis}
+  .score-panel-meta{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--muted);min-height:48px}
+  .score-panel-meta .quiet-button{font-size:11px;padding:0 4px}
+  .score-draft-note{font-size:11px;color:var(--gold);line-height:1.6;padding-bottom:8px}
+  .score-measures{flex:1;overflow:auto;min-height:0;overscroll-behavior:contain;scrollbar-width:thin;scroll-padding:12px 0}
+  .score-measure{display:flex;width:100%;align-items:center;gap:10px;text-align:left;padding:18px 7px;border-bottom:1px solid var(--line);border-radius:0;min-height:100px}
+  .score-measure.is-active{background:rgba(197,164,93,.08);box-shadow:inset 2px 0 var(--gold)}
+  .reading-bar-number{font:11px/1 Georgia,serif;color:var(--muted);width:16px;flex:none;align-self:flex-start;padding-top:12px}
+  .reading-notes{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:0}
+  .score-panel-footer{min-height:62px;display:flex;align-items:center;justify-content:space-between;gap:6px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+  .score-panel-footer>div{display:flex;gap:2px}.score-panel-footer .quiet-button{font-size:12px;padding:0 8px;color:var(--gold)}
+}
+/* Below the side-by-side threshold the score uses the readout's existing
+   footprint. It never removes a bell row or overlaps a strike target. */
+@media(max-width:1279px){
+  .has-score .note-readout{display:none}
+  .has-score .compact-score{display:flex;align-items:center;gap:2px;flex:1;max-width:340px}
+  .compact-score>.icon-button{min-width:44px;min-height:44px;font:24px Georgia,serif;color:var(--gold);flex:none}
+  .compact-phrase{display:grid;gap:1px;min-width:44px;flex:1;padding:0;text-align:left;min-height:44px;align-content:center}
+  .compact-phrase>small{font-size:9px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .compact-notes{display:flex;gap:10px;align-items:center;overflow-x:auto;scrollbar-width:none;min-width:0;touch-action:pan-x;overscroll-behavior:contain}
+  .compact-notes>span{font:13px/16px Georgia,serif;white-space:nowrap;color:var(--dim);flex:none;display:grid;gap:1px}
+  .compact-notes b{font-weight:500}.compact-notes small{font:8px/10px sans-serif;color:var(--muted)}
+  .compact-phrase .is-current{color:var(--gold);text-decoration:underline;text-underline-offset:3px}
+}
+@media(max-width:1279px) and (orientation:landscape){
+  .has-score .compact-score{order:3;min-width:150px;justify-content:flex-end}
+}
+@media(orientation:portrait){
+  .has-score .compact-score{grid-row:1;grid-column:1;width:100%;max-width:none;overflow:hidden;gap:0}
+  .compact-notes{gap:9px}.compact-notes>span{font-size:12px}
+  .has-score .top-actions .observe-entry span{display:none}
+  .has-score .top-actions .observe-entry{padding:0;min-width:44px}
+}
+@media(max-width:359px){.compact-notes{gap:8px}.compact-notes>span{font-size:11px}.has-score .compact-score>.icon-button:first-child{display:none}}
+@media(max-width:700px) and (orientation:landscape){.has-score .compact-score{min-width:100px}.has-score.has-session .mute-button{display:none}.has-score.has-session .compact-score>.icon-button:first-child{display:none}}
