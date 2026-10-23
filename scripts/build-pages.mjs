@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const output=resolve(root,'_site');
-const versions=['r14'];
+const versions=['r14','r15'];
 const allowed=new Set(['.html','.css','.mjs','.js','.json','.webp','.glb','.mp3','.mid','.musicxml','.txt']);
 const metadata={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),builtAt:new Date().toISOString()};
 const toSlash=name=>name.split(sep).join('/');

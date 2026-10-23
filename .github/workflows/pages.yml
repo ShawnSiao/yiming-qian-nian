@@ -30,6 +30,14 @@ jobs:
           node versions/r14/test-mobile-viewport.mjs
           node versions/r14/test-recording-score.mjs
           node versions/r14/test-workspace.mjs
+      - name: Validate the seven-bell R15 version
+        run: |
+          node versions/r15/test-paired-instrument.mjs
+          node versions/r15/test-performance.mjs
+          node versions/r15/test-interaction.mjs
+          node versions/r15/test-mobile-viewport.mjs
+          node versions/r15/test-recording-score.mjs
+          node versions/r15/test-workspace.mjs
       - name: Build the allowlisted static site
         run: node scripts/build-pages.mjs
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5

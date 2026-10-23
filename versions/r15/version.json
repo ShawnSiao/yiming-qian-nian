@@ -1,0 +1,10 @@
+{
+  "version": "r15-preview.1",
+  "date": "2026-10-23",
+  "path": "versions/r15/",
+  "status": "public-preview",
+  "features": ["seven natural-center bells per register", "sketched C/E, D/F, G/B and A/next-C pairing", "retained E/E, F/F-sharp and B/B pairing", "small-letter register notation", "7/14/21-bell responsive performance", "single-bell 3D observation", "resizable score workspace", "short and full-span Zhu Zhi Ci"],
+  "pitchRange": "C3-C7 natural notes and F-sharp in registers 3-6; not a full chromatic instrument",
+  "scoreStatus": "Full-span Zhu Zhi Ci is a transcription draft, not an approved score; 54 attacks remain marked for review.",
+  "deviceStatus": "Desktop browser viewport checks completed; real iPhone and Android device acceptance is pending."
+}
