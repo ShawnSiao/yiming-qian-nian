@@ -1,90 +1,88 @@
-# 一鸣千年·掌上编钟
+# Yiming · A Thousand Echoes
 
-轻触编钟，奏响千年礼乐。
+**English** | [简体中文](README.zh-CN.md)
 
-一个纯前端的数字编钟演奏工具：三层十二件钟、一钟双音、七首曲谱可先听再跟奏。
-音色由浏览器实时合成，没有音频文件，也不需要联网和登录。
+Explore a Chinese bronze chime bell, hear how one bell can produce two tones, and play melodies in a browser.
 
-**在线体验**：<https://shawnsiao.github.io/yiming-qian-nian/>
+[**Try the English version**](https://shawnsiao.github.io/yiming-qian-nian/?lang=en) · [中文版](https://shawnsiao.github.io/yiming-qian-nian/?lang=zh)
 
-**R15 试用版**：[七钟配对与小字组音名版](https://shawnsiao.github.io/yiming-qian-nian/versions/r15/?view=play&score=zhuzhi-ci-recording)。版本 `r15-preview.1`，保留每组七口钟和手绘配对，支持手机横竖屏；两个版本的《竹枝词》和单钟 3D 观赏保持可用。[版本说明](versions/r15/README.md)。
+## Play and explore
 
-**R14 试用版**：[新版看谱演奏工作台](https://shawnsiao.github.io/yiming-qian-nian/versions/r14/?view=play&score=zhuzhi-ci-recording)。版本 `r14-preview.1`，包含扩展音域、单钟 3D 观赏、可调曲谱栏及两个版本的《竹枝词》；完整版仍为转谱初稿。[版本说明](versions/r14/README.md)。下文保留旧版使用说明。
+- **Hear the difference.** Tap the center and either side of the large bell on the home screen. Drag to rotate, pinch to zoom and pan, or use the keyboard.
+- **Play a phrase.** Choose a score, hear a demonstration, then follow the highlighted striking area. Wait mode advances only after the correct note; timed mode follows a beat.
+- **Keep the bells playable on a phone.** The stage adapts between 7, 14 and 21 bells. Narrow portrait screens wrap each seven-bell register into two visual lines. Change the pitch range when a melody moves beyond the visible bells. Landscape provides more room.
+- **Read while playing.** Wide screens place a resizable score beside the bells. Phones retain a compact phrase strip beneath the stage.
+- **Save an idea.** Record your strikes, name the piece when saving, rename it later, and replay it from **Saved**. These are note-event recordings, not microphone recordings or audio files.
+- **Look inside.** Explore the single 3D bell, select structural parts, or open a cutaway. Explanations link to museum and research sources.
 
-## 怎么玩
+The interface supports English and Simplified Chinese. A first visit follows the browser's supported language; the language button saves a preference. `?lang=en` and `?lang=zh` override it. Language changes preserve saved recordings and pause an active exercise at its current position.
 
-1. 打开页面，先轻触**进入编钟演奏**——这一步是在给浏览器授权发声（浏览器的自动播放限制要求必须由用户手势触发）。
-2. 敲同一口钟的**中央**（正鼓）和**两侧**（侧鼓），会听到两个不同的音，这就是合瓦形钟体的「一钟双音」。
-3. 支持**多点同时敲击**，可以两只手一起按。
-4. 「乐谱」里选一首 → **听一遍**感受拍位 → **跟着敲**，跟着亮起的钟落槌。
-5. 自由演奏时点「录钟曲」，敲击事件会记录在本地，最多保存 30 首。
+## Notes and range
 
-> 铃音偏低或听不见时，先确认手机没开静音（iOS 的静音键会静音 Web Audio），再在设置里调高主音量。
+English pitch labels use scientific pitch notation: **C4** is middle C; **F♯4** is F-sharp above it. The Chinese interface retains the original small-letter octave labels.
 
-## 技术实现
+Numbered scores use scale degrees **1–7**. `1=C` makes 1 equal C; `1=F` makes it F. Dots above or below move a note by an octave. The pitch name beneath each score note identifies the corresponding bell.
 
-| 项目 | 说明 |
+Each register retains seven natural center notes, from C through B, with this modern performance mapping:
+
+| Bell center | Either side |
 | --- | --- |
-| 钟架与钟体 | Canvas 2D 绘制 + `.webp` 位图叠色，30fps 上限、与帧率无关的动画计时 |
-| 音色 | Web Audio 实时加法合成：基频 + 3 个非整数泛音（1.48 / 2.41 / 3.06 倍），配合 `DynamicsCompressor` 做总线压限 |
-| 交互 | Pointer Events，天然支持鼠标与多点触控；桌面端另配一整套键盘映射 |
-| 响应式 | 纯 CSS 媒体查询驱动四套布局，画布按容器尺寸实时重算钟体几何 |
-| 存储 | 只用浏览器本地存储保存设置、随奏进度与作品；不上传、不联网 |
-| 离线 | 全部资源相对引用，加载一次后可离线运行；支持「添加到主屏幕」全屏使用 |
+| C | E |
+| D | F |
+| E | E |
+| F | F♯ |
+| G | B |
+| A | C in the next octave |
+| B | B |
 
-曲库共 6 首：1 首原创练习，2 首传统曲调重新编配（茉莉花、凤阳花鼓），3 首公版旋律自制编配（小星星、欢乐颂、两只老虎）。所有曲目以本地事件序列存储，不含第三方音频。
+Selectable registers span **C3–B6**, with the highest A-bell side reaching **C7**. This mapping includes natural notes and F-sharp; it is **not a complete chromatic instrument**. Pitch pairs and seven-bell groups are an interaction design, not a reconstruction of the tuning of a particular excavated set.
 
-## 界面会跟随浏览器自动变形
+## Scores
 
-同一份代码，按窗口尺寸与设备能力自动切换四种形态，不需要手动切版：
+The library includes introductory exercises, familiar melodies and two versions of **Zhuzhi Ci**:
 
-| 打开方式 | 界面形态 |
-| --- | --- |
-| 手机竖屏（≤ 600px 宽） | 满屏竖版：编钟在上、音读在中、底部横向导航 |
-| 手机横屏 | 横向舞台：编钟占满左侧，右侧窄控制台＋底部导航 |
-| 平板 / 电脑（≥ 900px 且横向窗口） | 宽屏舞台：应用以 1240×860 圆角窗口居中，左侧编钟、右侧 372px 控制台，底部导航收进控制台 |
-| 电脑上把窗口拖成竖长条 | 自动退回竖版窄栏（520px 居中），保持手机端体验 |
+- **Short:** the supplied eight-bar theme, about 30 seconds, `1=C`.
+- **Full:** a draft transcription covering the supplied 2:33 recording, `1=F`, with reference audio, MIDI, MusicXML and a printable score page.
 
-判定完全交给 CSS 媒体查询（`orientation` / `min-width` / `min-height` / `pointer`），不靠 User-Agent 嗅探，缩放窗口或旋转设备都会实时重排；编钟的钟体尺寸也按行高比例动态换算，所以在宽屏舞台里不会被拉成扁钟。
+The full version follows prominent strikes in an ensemble. It has not received expert note-by-note verification or reliable separation of bronze bells and stone chimes. **＊** marks notes requiring review. Its reference accompaniment is also a transcription estimate. Arrangements and third-party music have separate rights considerations; see [credits and asset notes](docs/credits.md).
 
-## 桌面端快捷键
+## Sound, storage and model limits
 
-电脑上除了鼠标点击，也可以直接敲键盘：
+Sound is enabled by default, but browsers may require the first tap before starting audio. Use the volume control or replay the entrance after interacting. Performance tones and the entrance sound are synthesized, not recordings of a museum instrument. Reduced-motion preferences are respected, and rendering stops when the scene is idle or hidden.
 
-- <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> — 上层四件钟
-- <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> — 中层四件钟
-- <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> — 下层四件钟
-- 按住 <kbd>Shift</kbd> 再按 = 敲钟体两侧的**侧鼓**（默认敲中央的正鼓）
+Saved pieces, volume and language preferences stay in browser storage. There is no application backend, microphone capture, account system or analytics integration. Existing R14/R15 recordings use the same storage identity. Clearing site data or using a different browser/device can remove or separate saved work. Initial page and asset loading requires a network connection; no offline cache installation is provided.
 
-## 浏览器适配
+The photo-informed 3D model is an educational approximation. Proportions, wall thickness, decoration and reconstructed inscription lettering are not a measured archaeological replica. The cutaway is a structural illustration, not an acoustic simulation.
 
-原版运行在小红书小工具容器里，移植到公开网页后做了这些适配：
+## Run locally
 
-- **形态切换**：见上一节，宽窗走横屏控制台布局，窄屏走竖版布局。
-- **高度**：`100dvh` + `visualViewport` 双保险，规避移动端地址栏收放导致的高度跳变。
-- **手势**：`touch-action` 分级（画布 `none`，其余 `manipulation`），屏蔽双击缩放与 `gesturestart` pinch 缩放；`overscroll-behavior: none` 去掉下拉刷新与橡皮筋。
-- **安全区**：沿用 `env(safe-area-inset-*)`，适配刘海屏与底部横条。
-- **跟奏横屏**：浏览器不允许页面锁定屏幕方向（`screen.orientation.lock` 仅在全屏生效），改为已有的 CSS 自旋转兜底；只有触屏竖屏设备才会提示「请手动横屏」，桌面端不打扰。
-- **音频**：解锁加超时兜底，避免个别 WebView 卡在启钟页；音频被系统挂起时会在下次敲击自动恢复。
-- **分享**：补 OG / Twitter 卡片、Web App Manifest 与 apple-touch-icon，便于在社交平台预览和「添加到主屏幕」。
+Use Node.js 24 or later. No dependency installation or bundling is needed:
 
-推荐环境：iOS Safari 15+、Android Chrome 90+、桌面 Chromium / Firefox / Safari。
-
-## 本地预览
-
-仓库根目录静态托管即可，无需构建：
-
-```bash
-python -m http.server 8000
-# 打开 http://127.0.0.1:8000
+```sh
+node scripts/serve.mjs
 ```
 
-GitHub Pages 由 `.github/workflows/pages.yml` 从 `main` 分支测试、构建和部署。`scripts/build-pages.mjs` 只打包旧版静态入口及固定版本的运行资源；旧版首页保持不变，R14、R15 分别位于 `versions/r14/`、`versions/r15/`。研究照片、源音频 WAV、Blender 工程、分析缓存和测试记录不进入 Pages 产物。
+Open [http://127.0.0.1:4312/app/](http://127.0.0.1:4312/app/). The server sets JavaScript MIME types explicitly, including `.mjs` on Windows.
 
-## 验证
+```sh
+node tests/i18n.mjs
+node tests/current-model.mjs
+node tests/home-arrival.mjs
+node tests/mobile-viewport.mjs
+node tests/practice.mjs
+node tests/workspace.mjs
+node scripts/build-pages.mjs
+node tests/pages.mjs
+```
 
-界面形态与交互用本机 Chrome 无头模式跑端到端断言（触摸启钟、落槌、渲染帧、多点触控、键盘敲击、六种视口形态），全部通过且无 JS 异常。
+The build writes only the generated `_site/` directory. Pull requests run validation; pushes merged into `main` publish that artifact through GitHub Actions to GitHub Pages. Repository-local design studies, Blender sources, original WAV files and validation output are excluded.
 
-## 许可
+## Earlier previews
 
-MIT License。工具本体来自 [siao-xhs-tools](https://github.com/shawnsiao) 仓库中的 `tools/yiming-qian-nian`，音色参数与教学文案归属该项目；曲库均为原创、传统曲调或公版旋律的本地事件编配。
+[**R15**](https://shawnsiao.github.io/yiming-qian-nian/versions/r15/) · [**R14**](https://shawnsiao.github.io/yiming-qian-nian/versions/r14/)
+
+These archived URLs remain available. The current app lives in [`app/`](app/). Browser viewport checks do not replace real iPhone/Android testing.
+
+## License
+
+Project code is provided under [MIT](LICENSE). Vendored libraries retain their own MIT notices. Music, reference recordings, reference photography and museum material are not granted an MIT license by this repository; consult the [credits and asset notes](docs/credits.md) before reusing them.

@@ -1,0 +1,10 @@
+{
+  "version": "r27.0.0",
+  "name": "Bilingual web release",
+  "languages": [
+    "en",
+    "zh-CN"
+  ],
+  "source": "Approved R26 experience",
+  "model": "single-bell.glb"
+}

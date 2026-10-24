@@ -1,0 +1,35 @@
+# Credits and asset notes
+
+[English README](../README.md) · [中文 README](../README.zh-CN.md)
+
+## Educational references
+
+The structural explanations in `app/data/bell-structure.mjs` carry links to their sources. The model is a photo-informed educational interpretation, not a scan or measured replica. Scientific labels and the seven-bell performance mapping describe this application rather than the original tuning of a particular ancient instrument.
+
+- [Hubei Provincial Museum: Marquis Yi of Zeng's chime bells](https://www.hbww.org.cn/zgzb/p/4695.html).
+- [Hubei Provincial Museum: music archaeology research](https://www.hbww.org.cn/hhfz70n/p/9134.html).
+- [Academia Sinica archaeological collection: bell parts](https://archeodata.sinica.edu.tw/exhibition/detail/157).
+- [Shanghai Museum: Jin Hou Su bells](https://www.shanghaimuseum.net/mu/show/202304/838cdaad-b93e-4c58-b046-edac0ec9639e/).
+
+User-supplied museum photographs informed the study. Original reference photographs, private attachments and research downloads are not included in this release. Inscription lettering is redrawn from cited readings, not a facsimile of an excavated inscription. The runtime does not claim measured wall thickness or acoustically accurate vibration modes.
+
+## Visuals and software
+
+The single-bell GLB was authored and refined in Blender for this project. Its web export embeds its textures. The palace background, two-dimensional bell images and mallet image are project-created visual assets, including AI-assisted imagery; they are not photographs of an actual ancient performance hall. These should not be used as archaeological evidence.
+
+Performance sound and the entrance bell are synthesized in Web Audio. They are not museum recordings. The reference track described below is a separate audio file.
+
+- [React](https://github.com/facebook/react): [MIT notice](../app/vendor/REACT-LICENSE.txt).
+- [Three.js](https://github.com/mrdoob/three.js): [MIT notice](../app/vendor/THREE-LICENSE.txt). The bundled loaders, controls and utilities belong to the same library.
+- Original project code: [MIT](../LICENSE).
+
+## Music and transcription
+
+The event data retain their per-piece `rightsStatus` and source information. These declarations are provenance notes, not evidence of a rights grant.
+
+- The short **Zhuzhi Ci** follows the user-supplied eight-bar theme page, credited on that page as an ancient melody arranged by **Wang Yuanping (王原平)**. The app's 64 BPM is a preview setting.
+- The full **Zhuzhi Ci** draft follows the user-supplied 153-second performance excerpt, corresponding to [this Bilibili performance](https://www.bilibili.com/video/BV17W411W75s/), 0:03–2:36. It is an approximate prominent-strike transcription. The 32-bar quantization and reference accompaniment have not been verified note by note by a musician. Notes marked ＊ remain uncertain; bells and stone chimes have not been reliably separated.
+- **Qing Tian / Sunny Day (晴天)** is third-party repertoire. Its inclusion is not a claim that the underlying composition or arrangement is public domain or MIT-licensed.
+- Traditional and familiar melodies use project event arrangements. An old melody does not automatically make every modern arrangement or recording reusable.
+
+The publication request for this project does not provide documentary verification of third-party composition, arrangement or recording rights. No such verification is asserted. Before redistributing those materials independently, confirm the applicable permissions with the relevant rights holders. Raw source WAV files are excluded from the Pages artifact.
