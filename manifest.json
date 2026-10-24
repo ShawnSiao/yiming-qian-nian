@@ -1,15 +1,14 @@
 {
-  "name": "一鸣千年·掌上编钟",
-  "short_name": "一鸣千年",
-  "description": "轻触编钟，奏响千年礼乐",
-  "lang": "zh-CN",
+  "name": "Yiming · A Thousand Echoes",
+  "short_name": "Yiming",
+  "description": "Explore bronze chime bells and play melodies. English and Chinese available.",
+  "lang": "en",
   "dir": "ltr",
-  "start_url": "./index.html",
+  "start_url": "./app/",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#101210",
-  "theme_color": "#101210",
+  "background_color": "#171e1a",
+  "theme_color": "#171e1a",
   "icons": [
     {
       "src": "./icon.png",

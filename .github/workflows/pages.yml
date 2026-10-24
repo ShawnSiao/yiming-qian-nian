@@ -1,6 +1,8 @@
-name: Deploy versioned previews to Pages
+name: Validate and deploy Yiming to Pages
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: github-pages
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -38,10 +40,21 @@ jobs:
           node versions/r15/test-mobile-viewport.mjs
           node versions/r15/test-recording-score.mjs
           node versions/r15/test-workspace.mjs
+      - name: Validate the bilingual current app
+        run: |
+          node tests/i18n.mjs
+          node tests/current-model.mjs
+          node tests/home-arrival.mjs
+          node tests/mobile-viewport.mjs
+          node tests/practice.mjs
+          node tests/workspace.mjs
       - name: Build the allowlisted static site
         run: node scripts/build-pages.mjs
+      - name: Check the generated release
+        run: node tests/pages.mjs
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        if: github.ref == 'refs/heads/main'
         with:
           path: _site
           include-hidden-files: true

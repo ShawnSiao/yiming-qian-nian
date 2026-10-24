@@ -1,0 +1,26 @@
+/* Preserve the established bronze palette; fit translated copy and controls. */
+.language-toggle{min-width:44px;min-height:44px;padding:0 10px;font-size:12px;white-space:nowrap;color:var(--dim)}
+.bank-shift-prompt{width:calc(100% - 24px);max-width:480px;display:grid;grid-template-columns:minmax(0,1fr) auto;line-height:1.5}.bank-shift-prompt button{min-width:100px}
+.settings-dialog .bank-picker>span{display:block}.setting-row>span{min-width:0}.setting-row select{min-width:0;max-width:64%}
+.bell-app .app-header .header-tools{display:flex;gap:8px;align-items:center}.notation-help{font-size:12px;color:var(--dim);margin:18px 0;line-height:1.8}.notation-help summary{cursor:pointer;color:var(--gold)}.notation-help p{padding:8px 0;max-width:650px}
+:lang(en){--display:Georgia,"Times New Roman",serif}
+:lang(en) .home-title h1{font-size:clamp(32px,3.2vw,48px);letter-spacing:.015em;line-height:1.15;max-width:440px}
+:lang(en) .home-lead{letter-spacing:0}:lang(en) .free-entry{min-width:70px}
+:lang(en) .settings-entry:after{content:"Settings"}
+:lang(en) .settings-entry{font-size:12px}
+:lang(en) .settings-entry:after{display:none}
+:lang(en) .home-guide .audition span:not(.step-mark){white-space:nowrap}
+@media(max-width:480px){
+  .app-header{padding:0 6px;gap:0}.app-header>.brand{width:44px;min-width:44px;padding:0;display:flex;align-items:center;justify-content:center}
+  .app-header>.brand>svg{display:block;width:19px;height:19px}.app-header>.brand>span,.app-header>.brand>strong{display:none}
+  .app-header nav{flex:1;gap:0;justify-content:center;min-width:0}.app-header nav button{min-width:44px;padding:0 2px;font-size:11px;letter-spacing:0}
+  .bell-app .app-header .header-tools{gap:0}.app-header .language-toggle,.app-header .settings-entry{width:44px;min-width:44px;padding:0;font-size:11px}
+  .app-header .settings-entry{font-size:0}.app-header .settings-entry:after{display:block;font-size:10px}:lang(en) .app-header .settings-entry{font-size:0}:lang(en) .app-header .settings-entry:after{display:block;content:"Settings"}
+  .view-home .app-header>.brand{width:auto;min-width:0;display:block;padding:0 4px}.view-home .app-header>.brand>svg{display:none}.view-home .app-header>.brand>strong{display:block;font-size:22px}
+  .view-home .app-header{padding:0 14px}
+  :lang(en) .song-info>strong{font-size:18px}.song-practice{font-size:12px}
+}
+@media(orientation:landscape) and (max-height:500px){
+  .app-header .language-toggle{min-width:40px;padding:0 5px}.app-header nav{gap:12px}:lang(en) .app-header .brand{min-width:78px}
+  :lang(en) .home-title h1{font-size:28px}.view-home .header-tools{display:flex}
+}
