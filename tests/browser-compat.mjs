@@ -252,6 +252,8 @@ async function core(browser,engine){
       THREE.Sprite.prototype.onBeforeRender=function(...args){before?.apply(this,args);if(this.renderOrder===10){window.__homeMalletSamples.push({source:this.material.map.image.src,toneMapped:this.material.toneMapped,center:this.center.toArray(),opacity:this.material.opacity});window.__homeMalletSamples=window.__homeMalletSamples.slice(-64);}};
       const after=THREE.Sprite.prototype.onAfterRender;
       THREE.Sprite.prototype.onAfterRender=function(...args){after?.apply(this,args);if(this.renderOrder===10&&!window.__homeMalletProof)window.__homeMalletProof=args[0].domElement.toDataURL('image/png');};
+      const afterScene=THREE.Scene.prototype.onAfterRender;
+      THREE.Scene.prototype.onAfterRender=function(renderer,...args){afterScene?.call(this,renderer,...args);const size=renderer.getSize(new THREE.Vector2());window.__homeRenderedViewport={width:size.x,height:size.y};};
     });
     for(const [index,region] of [[0,'center'],[1,'left']]){
       page.__yimingStep=`3D ${region} impact`;await watchHomeMallet(page,'.home-canvas-host');
@@ -272,10 +274,12 @@ async function core(browser,engine){
     const frames=await model.getAttribute('data-frames');await page.waitForTimeout(150);assert.equal(await model.getAttribute('data-frames'),frames,'3D feedback stops rendering when quiet');
     page.__yimingStep='mobile 3D impact';
     await page.getByRole('button',{name:'正面',exact:true}).click();
-    const beforeResize=Number(await model.getAttribute('data-frames'));await page.setViewportSize({width:390,height:844});
-    await page.waitForFunction(previous=>Number(document.querySelector('.home-canvas-host').dataset.frames)>previous&&document.querySelector('.home-canvas-host canvas').getBoundingClientRect().width<=390,beforeResize);
+    await page.evaluate(()=>window.__homeRenderedViewport=null);await page.setViewportSize({width:390,height:844});
+    await page.waitForFunction(()=>window.__homeRenderedViewport?.width===390&&document.querySelector('.home-canvas-host canvas').getBoundingClientRect().width<=390);
     await watchHomeMallet(page,'.home-canvas-host');
     const contacts=JSON.parse(await model.getAttribute('data-contacts')),p=contacts.find(point=>point.region==='center'),bounds=await model.locator('canvas').boundingBox();
+    const target=await page.evaluate(({x,y})=>{const element=document.elementFromPoint(x,y),focus=document.querySelector('.home-object');return {x,y,element:element?.tagName,className:element?.className,inBell:focus.contains(element),focus:focus.getBoundingClientRect().toJSON()};},{x:bounds.x+p.x,y:bounds.y+p.y});
+    assert.ok(target.inBell,`The rendered mobile strike point must reach the bell input: ${JSON.stringify(target)}`);
     await page.mouse.click(bounds.x+p.x,bounds.y+p.y);await page.waitForFunction(()=>window.__malletSeen.length>0);
     assert.equal(await page.evaluate(()=>window.__malletSeen[0].height),190);await shot(page,engine+'-matched-mallet-mobile-3d');
     page.__yimingStep='mobile 2D impact';
