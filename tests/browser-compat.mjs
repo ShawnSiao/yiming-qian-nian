@@ -26,6 +26,37 @@ async function homeHit(page,region='center'){
   const host=page.locator('.home-2d-host'),contacts=JSON.parse(await host.getAttribute('data-contacts')),point=contacts.find(c=>c.region===region),bounds=await host.boundingBox();
   await page.mouse.click(bounds.x+point.x,bounds.y+point.y);await page.waitForFunction(midi=>document.querySelector('.home-2d-host')?.dataset.lastMidi===String(midi),point.midi);
 }
+// Impact frames are deliberately brief. Retain rendered evidence rather than
+// requiring the browser driver to poll inside the 480ms mallet window.
+async function watchHomeMallet(page,selector){
+  await page.evaluate(selector=>{
+    window.__malletObserver?.disconnect();window.__malletSeen=[];
+    const host=document.querySelector(selector);
+    window.__malletObserver=new MutationObserver(()=>{
+      if(Number(host.dataset.malletCount)>0){window.__malletSeen.push({height:Number(host.dataset.malletHeight),source:host.dataset.malletSource,frames:JSON.parse(host.dataset.malletFrames||'[]'),contacts:JSON.parse(host.dataset.contacts||'[]')});window.__malletSeen=window.__malletSeen.slice(-64);}
+    });
+    window.__malletObserver.observe(host,{attributes:true,attributeFilter:['data-frames']});
+  },selector);
+}
+async function renderedPitches(page,midis){
+  return page.evaluate(async midis=>{
+    const {BellAudio}=await import('./audio.mjs'),answers=[];
+    const Offline=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+    if(!Offline)return {available:false,reason:'This browser test build has no offline Web Audio API',realtimeAvailable:!!(window.AudioContext||window.webkitAudioContext)};
+    for(const midi of midis){
+      const context=new Offline(1,96000,48000),audio=new BellAudio();audio.context=context;audio.master=context.createGain();audio.master.gain.value=.24;audio.master.connect(context.destination);audio.unlock=async()=>{};
+      await audio.strike(midi);const buffer=await context.startRendering(),data=buffer.getChannelData(0),start=2400,n=18000;
+      let best=-Infinity,note=0;
+      for(let candidate=48;candidate<=100;candidate++){
+        const f=440*2**((candidate-69)/12),coefficient=2*Math.cos(2*Math.PI*f/48000);let s0=0,s1=0,s2=0;
+        for(let i=0;i<n;i++){s0=data[start+i]*(.5-.5*Math.cos(2*Math.PI*i/(n-1)))+coefficient*s1-s2;s2=s1;s1=s0;}
+        const power=s1*s1+s2*s2-coefficient*s1*s2;if(power>best){best=power;note=candidate;}
+      }
+      audio.stop();audio.context=null;audio.dispose();answers.push({midi,measuredMidi:note});
+    }
+    return {available:true,notes:answers};
+  },midis);
+}
 async function playMidi(page,midi){
   const tags=JSON.parse(await page.locator('.main-performance-surface').getAttribute('data-note-plaques'));
   const tag=tags.find(tag=>tag.midi===midi&&tag.region==='center')||tags.find(tag=>tag.midi===midi);assert.ok(tag,`Visible contact for MIDI ${midi}`);await hit(page,tag.id,tag.region,midi);
@@ -40,7 +71,7 @@ async function test(browser,engine,name,run,options={}){
   await context.addInitScript(()=>{window.__qaContexts=[];window.__qaGL=[];const original=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){const context=original.call(this,type,...args);if(type==='webgl'||type==='webgl2'){window.__qaContexts.push(type);if(context&&!window.__qaGL.includes(context))window.__qaGL.push(context);}return context;};});
   const started=Date.now();
   try{const details=await run(page,context,requests);assert.deepEqual(errors,[],'No uncaught page errors');report.results.push({engine,name,passed:true,ms:Date.now()-started,details});console.log('PASS',engine,name,Date.now()-started,'ms');}
-  catch(error){await shot(page,`${engine}-${name}-FAILED`).catch(()=>{});report.results.push({engine,name,passed:false,error:error.stack,errors});console.log('FAIL',engine,name,error.message);}
+  catch(error){await shot(page,`${engine}-${name}-FAILED`).catch(()=>{});report.results.push({engine,name,passed:false,step:page.__yimingStep,error:error.stack,errors});console.error('FAIL',engine,name,page.__yimingStep||'',error.stack);}
   finally{await context.close();await writeFile(resolve(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
 }
 async function core(browser,engine){
@@ -61,23 +92,7 @@ async function core(browser,engine){
     const row=keys.indexOf(4),keyboard=['1234','qwer','asdf'][row];assert.ok(keyboard);
     for(const [column,midi] of [[0,64],[1,65],[2,71],[3,72]]){await page.keyboard.press('Shift+'+keyboard[column]);await page.waitForFunction(note=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(note),midi);}
     await page.locator('.bank-picker select:visible').first().selectOption('4');await hit(page,'bell-6-a','right',96);await shot(page,engine+'-play-c7');
-    const frequency=await page.evaluate(async()=>{
-      const {BellAudio}=await import('./audio.mjs'),answers=[];
-      const Offline=window.OfflineAudioContext||window.webkitOfflineAudioContext;
-      if(!Offline)return {available:false,reason:'This browser test build has no offline Web Audio API',realtimeAvailable:!!(window.AudioContext||window.webkitAudioContext)};
-      for(const midi of [48,52,60,64,72,76,67,65,66,71,74,98]){
-        const context=new Offline(1,96000,48000),audio=new BellAudio();audio.context=context;audio.master=context.createGain();audio.master.gain.value=.24;audio.master.connect(context.destination);audio.unlock=async()=>{};
-        await audio.strike(midi);const buffer=await context.startRendering(),data=buffer.getChannelData(0),start=2400,n=18000;
-        let best=-Infinity,note=0;
-        for(let candidate=48;candidate<=100;candidate++){
-          const f=440*2**((candidate-69)/12),coefficient=2*Math.cos(2*Math.PI*f/48000);let s0=0,s1=0,s2=0;
-          for(let i=0;i<n;i++){s0=data[start+i]*(.5-.5*Math.cos(2*Math.PI*i/(n-1)))+coefficient*s1-s2;s2=s1;s1=s0;}
-          const power=s1*s1+s2*s2-coefficient*s1*s2;if(power>best){best=power;note=candidate;}
-        }
-        audio.stop();audio.context=null;audio.dispose();answers.push({midi,measuredMidi:note});
-      }
-      return {available:true,notes:answers};
-    });if(frequency.available)assert.ok(frequency.notes.every(p=>p.midi===p.measuredMidi),'Actual rendered sound matches the specified notes');
+    const frequency=await renderedPitches(page,[48,52,60,64,72,76,67,65,66,71,74,98]);if(frequency.available)assert.ok(frequency.notes.every(p=>p.midi===p.measuredMidi),'Actual rendered sound matches the specified notes');
     else report.limits.push(`${engine}: ${frequency.reason}; realtime audio available: ${frequency.realtimeAvailable}. Audio measurements remain unverified on this engine.`);
     return {frequency};
   });
@@ -194,21 +209,40 @@ async function core(browser,engine){
       const create=Audio.prototype.createOscillator;
       Audio.prototype.createOscillator=function(){const oscillator=create.call(this),start=oscillator.start.bind(oscillator);oscillator.start=(...args)=>{window.__legacyFrequencies.push(oscillator.frequency.value);return start(...args);};return oscillator;};
     },work);
-    await open(page,'works');await page.getByRole('button',{name:/播放.*Old pitch take/}).click();await page.locator('.bell-app[data-phase="work"]').waitFor();
+    await open(page,'works');
+    await page.evaluate(async()=>{
+      const {BellAudio}=await import('./audio.mjs'),strike=BellAudio.prototype.strike;
+      window.__legacyDispatched=[];window.__legacyOutcomes=[];window.__legacyContexts=[];
+      BellAudio.prototype.strike=async function(midi,...args){
+        window.__legacyDispatched.push(midi);
+        try{const pending=strike.call(this,midi,...args);if(this.context&&!window.__legacyContexts.includes(this.context))window.__legacyContexts.push(this.context);const started=await pending;window.__legacyOutcomes.push({midi,started});return started;}
+        catch(error){window.__legacyOutcomes.push({midi,error:error.name,message:error.message});throw error;}
+      };
+    });
+    await page.getByRole('button',{name:/播放.*Old pitch take/}).click();await page.locator('.bell-app[data-phase="work"]').waitFor();
     await page.locator('.bell-app[data-phase="free"]').waitFor();
-    const frequencies=await page.evaluate(()=>window.__legacyFrequencies);
+    const frequencies=await page.evaluate(()=>window.__legacyFrequencies);let offline;
+    assert.deepEqual(await page.evaluate(()=>window.__legacyDispatched),work.events.map(event=>event.midi),'Replay dispatch preserves every historical MIDI, including unavailable rack pitches');
     if(frequencies.length){assert.equal(frequencies.length,12);work.events.forEach((event,index)=>assert.ok(Math.abs(frequencies[index*3]-440*2**((event.midi-69)/12))<.1,'Legacy F-sharp and D7 keep their absolute frequency'));}
-    else assert.equal(await page.evaluate(()=>!!(window.AudioContext||window.webkitAudioContext)),false);
+    else{
+      const capability=await page.evaluate(()=>({api:!!(window.AudioContext||window.webkitAudioContext),states:window.__legacyContexts.map(context=>context.state),outcomes:window.__legacyOutcomes}));
+      assert.ok(!capability.api||capability.states.length>0&&capability.states.every(state=>state!=='running')||capability.outcomes.some(outcome=>['NotSupportedError','NotAllowedError','InvalidStateError','AbortError'].includes(outcome.error)),`A running audio context must produce oscillators: ${JSON.stringify(capability)}`);
+      offline=await renderedPitches(page,work.events.map(event=>event.midi));
+      if(offline.available)assert.ok(offline.notes.every(note=>note.midi===note.measuredMidi),'Headless replay still verifies the actual rendered frequency for every dispatched legacy pitch');
+      report.limits.push(`${engine}: realtime legacy audio did not start: ${JSON.stringify(capability)}. MIDI dispatch and stored events verified; offline rendered pitch verification: ${offline.available}.`);
+    }
     assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ymqn:3d:v1:works'))),[work]);
     assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-midi'),'71','Unavailable D7 does not highlight a different bell');
-    return {events:work.events.map(e=>e.midi),audioVerified:frequencies.length>0};
+    return {events:work.events.map(e=>e.midi),realtimeAudioVerified:frequencies.length>0,offline};
   });
   await test(browser,engine,'home-mallet-parity',async(page,context)=>{
+    page.__yimingStep='2D artwork';
     await open(page);await settled(page);const flat=page.locator('.home-2d-host'),model=page.locator('.home-canvas-host');
     await flat.locator(':scope').waitFor();await page.locator('.home-2d-host[data-mallet-source]').waitFor();
     const source=await flat.getAttribute('data-mallet-source');assert.match(source,/bell-mallet-v10\.(webp|png)$/);
-    await homeHit(page);await page.waitForFunction(()=>Number(document.querySelector('.home-2d-host').dataset.malletCount)>0);
-    const desktopHeight=Number(await flat.getAttribute('data-mallet-height'));await shot(page,engine+'-matched-mallet-2d');
+    await watchHomeMallet(page,'.home-2d-host');await homeHit(page);await page.waitForFunction(()=>window.__malletSeen.length>0);
+    const desktopHeight=await page.evaluate(()=>window.__malletSeen[0].height);await shot(page,engine+'-matched-mallet-2d');
+    page.__yimingStep='3D artwork loading';
     await modelSwitch(page).check();await page.locator('.home-object[data-model-state="ready"],.home-object[data-model-state="unsupported"]').waitFor({timeout:35000});
     if(await page.locator('.home-object').getAttribute('data-model-state')==='unsupported')return {threeD:'unsupported'};
     await page.waitForFunction(expected=>document.querySelector('.home-canvas-host').dataset.malletSource===expected,source);
@@ -220,8 +254,9 @@ async function core(browser,engine){
       THREE.Sprite.prototype.onAfterRender=function(...args){after?.apply(this,args);if(this.renderOrder===10&&!window.__homeMalletProof)window.__homeMalletProof=args[0].domElement.toDataURL('image/png');};
     });
     for(const [index,region] of [[0,'center'],[1,'left']]){
+      page.__yimingStep=`3D ${region} impact`;await watchHomeMallet(page,'.home-canvas-host');
       await page.locator('.audition-steps button').nth(index).click();
-      const sample=await page.waitForFunction(region=>{const host=document.querySelector('.home-canvas-host'),frame=JSON.parse(host.dataset.malletFrames).findLast(frame=>frame.region===region);return frame?{frame,contact:JSON.parse(host.dataset.contacts).find(p=>p.region===region)}:false;},region);
+      const sample=await page.waitForFunction(region=>{const seen=window.__malletSeen.find(seen=>seen.frames.some(frame=>frame.region===region));return seen?{frame:seen.frames.findLast(frame=>frame.region===region),contact:seen.contacts.find(p=>p.region===region)}:false;},region);
       const {frame,contact}=await sample.jsonValue(),side=region==='left'?-1:1;
       assert.equal(frame.height,desktopHeight);
       assert.ok(Math.abs(frame.x-side*(1-frame.alpha)*16-contact.x)<1&&Math.abs(frame.y-(1-frame.alpha)*18-contact.y)<1,'Mallet head follows the actual projected strike and the same 2D recoil');
@@ -229,23 +264,31 @@ async function core(browser,engine){
     }
     const proof=await page.evaluate(()=>window.__homeMalletProof);assert.ok(proof);await writeFile(resolve(output,engine+'-matched-mallet-3d-layer.png'),Buffer.from(proof.split(',')[1],'base64'));
     const material=await page.evaluate(()=>window.__homeMalletSamples.at(-1));assert.ok(material);assert.match(material.source,/bell-mallet-v10\.(webp|png)$/);assert.equal(material.toneMapped,false);assert.deepEqual(material.center,[.5,.86]);
+    page.__yimingStep='3D zoom and rapid strikes';
     await page.locator('.home-object').focus();await page.keyboard.press('ArrowRight');await page.keyboard.press('+');
-    await page.locator('.audition-steps button').first().click();await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);assert.equal(Number(await model.getAttribute('data-mallet-height')),desktopHeight);
+    await watchHomeMallet(page,'.home-canvas-host');await page.locator('.audition-steps button').first().click();await page.waitForFunction(()=>window.__malletSeen.length>0);assert.equal(await page.evaluate(()=>window.__malletSeen[0].height),desktopHeight);
     for(let n=0;n<8;n++)await page.locator('.audition-steps button').nth(n%2).click();assert.ok(Number(await model.getAttribute('data-mallet-count'))<=3);
     await page.waitForFunction(()=>{const host=document.querySelector('.home-canvas-host'),frames=host.dataset.frames,previous=window.__malletIdleProbe;if(!previous||previous.frames!==frames){window.__malletIdleProbe={frames,at:performance.now()};return false;}return host.dataset.malletCount==='0'&&performance.now()-previous.at>240;},null,{timeout:4000});
     const frames=await model.getAttribute('data-frames');await page.waitForTimeout(150);assert.equal(await model.getAttribute('data-frames'),frames,'3D feedback stops rendering when quiet');
-    await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);
+    page.__yimingStep='mobile 3D impact';
+    await page.getByRole('button',{name:'正面',exact:true}).click();
+    const beforeResize=Number(await model.getAttribute('data-frames'));await page.setViewportSize({width:390,height:844});
+    await page.waitForFunction(previous=>Number(document.querySelector('.home-canvas-host').dataset.frames)>previous&&document.querySelector('.home-canvas-host canvas').getBoundingClientRect().width<=390,beforeResize);
+    await watchHomeMallet(page,'.home-canvas-host');
     const contacts=JSON.parse(await model.getAttribute('data-contacts')),p=contacts.find(point=>point.region==='center'),bounds=await model.locator('canvas').boundingBox();
-    await page.mouse.click(bounds.x+p.x,bounds.y+p.y);await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);
-    assert.equal(Number(await model.getAttribute('data-mallet-height')),190);await shot(page,engine+'-matched-mallet-mobile-3d');
-    await modelSwitch(page).uncheck();await page.locator('.home-object[data-model-state="off"]').waitFor();await homeHit(page);
-    await page.waitForFunction(()=>Number(document.querySelector('.home-2d-host').dataset.malletCount)>0);assert.equal(Number(await flat.getAttribute('data-mallet-height')),190);
+    await page.mouse.click(bounds.x+p.x,bounds.y+p.y);await page.waitForFunction(()=>window.__malletSeen.length>0);
+    assert.equal(await page.evaluate(()=>window.__malletSeen[0].height),190);await shot(page,engine+'-matched-mallet-mobile-3d');
+    page.__yimingStep='mobile 2D impact';
+    await modelSwitch(page).uncheck();await page.locator('.home-object[data-model-state="off"]').waitFor();await watchHomeMallet(page,'.home-2d-host');await homeHit(page);
+    await page.waitForFunction(()=>window.__malletSeen.length>0);assert.equal(await page.evaluate(()=>window.__malletSeen[0].height),190);
     assert.ok(await page.evaluate(()=>window.__qaGL.every(context=>context.isContextLost())));
+    page.__yimingStep='missing artwork fallback';
     await page.route(/\/bell-mallet-v10\.(?:webp|png)$/,route=>route.fulfill({status:404,body:''}));await page.reload();await settled(page);
     await modelSwitch(page).check();await page.locator('.home-object[data-model-state="ready"]').waitFor({timeout:35000});
     assert.equal(await model.getAttribute('data-mallet-source'),'local-outline');
+    await watchHomeMallet(page,'.home-canvas-host');
     const fallback=JSON.parse(await model.getAttribute('data-contacts')).find(point=>point.region==='center'),fallbackBounds=await model.locator('canvas').boundingBox();await page.mouse.click(fallbackBounds.x+fallback.x,fallbackBounds.y+fallback.y);
-    await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);
+    await page.waitForFunction(()=>window.__malletSeen.length>0);
     return {source,desktopHeight,mobileHeight:190,sharedArtwork:true,fallbackVisible:true};
   });
 }
@@ -352,4 +395,4 @@ try{
     await core(browser,name);if(name==='chromium')await faults(browser);await browser.close();
   }
 }finally{server?.kill();await writeFile(resolve(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
-const failures=report.results.filter(result=>!result.passed);console.log(`BROWSER RESULT: ${report.results.length-failures.length} passed, ${failures.length} failed.`);if(failures.length||!report.results.length)process.exitCode=1;
+const failures=report.results.filter(result=>!result.passed);console.log(`BROWSER RESULT: ${report.results.length-failures.length} passed, ${failures.length} failed.`);console.log('BROWSER LIMITS:',JSON.stringify(report.limits));if(failures.length||!report.results.length)process.exitCode=1;
