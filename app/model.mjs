@@ -1,6 +1,7 @@
 // Absolute pitches are independent of the camera, layout and display names.
 import { SIZE_STUDY } from './data/bell-sizes.mjs';
 import { SUSPENSION } from './data/suspension-r6.mjs';
+export {pairedBellAt as bellAt,pairedPositionForMidi as bellForMidi} from './paired-instrument.mjs';
 export { SIZE_STUDY };
 export const NATURALS = Object.freeze(['C', 'D', 'E', 'F', 'G', 'A', 'B']);
 export const OFFSETS = Object.freeze([0, 2, 4, 5, 7, 9, 11]);
@@ -12,30 +13,6 @@ export const LIMITS = Object.freeze({
   target: 44, targetGap: 8, bodyWidth: 64, bodyHeight: 100,
   cellHeight: 124, rowGap: 12, minimumStageWidth: 0,
 });
-
-export function bellAt(octave, column) {
-  if (!Number.isInteger(octave) || octave < 3 || octave > 6 || !NATURALS[column]) {
-    throw new RangeError('Unsupported bell position');
-  }
-  const natural = NATURALS[column];
-  const centerMidi = (octave + 1) * 12 + OFFSETS[column];
-  const sameSide = natural === 'E' || natural === 'B';
-  return Object.freeze({
-    id: `bell-${octave}-${natural.toLowerCase()}`, octave, column, natural,
-    centerMidi, sideMidi: centerMidi + (sameSide ? 0 : 1),
-    centerName: `${natural}${octave}`,
-    sideName: `${natural}${sameSide ? '' : '♯'}${octave}`, sameSide,
-  });
-}
-
-export function bellForMidi(midi) {
-  if (!Number.isInteger(midi) || midi < 48 || midi > 95) return null;
-  const octave = Math.floor(midi / 12) - 1;
-  const pitch = midi % 12;
-  const center = OFFSETS.indexOf(pitch);
-  const column = center >= 0 ? center : OFFSETS.indexOf(pitch - 1);
-  return { bell: bellAt(octave, column), zone: center >= 0 ? 'center' : 'side' };
-}
 
 export function resolveStrikeRegion(bell,midi,preferred) {
   if(['center','left','right'].includes(preferred) && bell[preferred==='center'?'centerMidi':'sideMidi']===midi)return preferred;

@@ -6,8 +6,9 @@ export const ANCHORS = Object.freeze({
   naturalLabel: [0, .512, .145], leftLabel: [-.174, .103, .08], rightLabel: [.174, .103, .08],
 });
 
-export async function loadObservationGeometry() {
-  const gltf=await new GLTFLoader().loadAsync(new URL('./models/single-bell.glb',import.meta.url).href);
+export async function loadObservationGeometry({bytes}={}) {
+  const loader=new GLTFLoader();
+  const gltf=bytes?await loader.parseAsync(bytes.slice(0),new URL('./models/',import.meta.url).href):await loader.loadAsync(new URL('./models/single-bell.glb',import.meta.url).href);
   gltf.scene.updateMatrixWorld(true);
   let mesh;
   gltf.scene.traverse(o=>{if(o.isMesh&&!mesh)mesh=o;});

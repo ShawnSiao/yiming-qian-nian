@@ -9,7 +9,9 @@ import {appendStrike,recordedWork,workTitle,renameWork} from './recording-model.
 import {clampSplitFraction} from './score-workspace.mjs';
 import {pitchLabel,pitchFitsBank,isPairedPitch,registerLabel} from './paired-instrument.mjs';
 import {measuresFor,practiceBank,practiceHit,phraseEvents} from './practice-model.mjs';
-import {Header,Icon,HomeTitle,HomeGuide,HomeStudy,ScoreAside,PhraseStrip,BankPicker,LibraryPage,ObservePanel,WorksPage} from './components.mjs';
+import {Home2DScene} from './home-2d-scene.mjs';
+import {ModelResource,mountModel} from './model-resource.mjs';
+import {Header,Icon,HomeTitle,HomeGuide,HomeStudy,ModelModeControl,ScoreAside,PhraseStrip,BankPicker,LibraryPage,ObservePanel,WorksPage} from './components.mjs';
 
 const {createElement:h,useState,useEffect,useRef}=window.React;
 const songs=window.YMQNSongs||[];
@@ -26,7 +28,10 @@ const initial={view:['home','play','library','observe','works'].includes(deepVie
 function App(){
   const [language,setLanguage]=useState(getLocale);
   const [state,setState]=useState(initial),[heard,setHeard]=useState({center:false,side:false}),[homeLast,setHomeLast]=useState(null),[theme,setTheme]=useState('relief');
-  const [homeReady,setHomeReady]=useState(false),[modelError,setModelError]=useState(false),[layout,setLayout]=useState({rows:2,low:3,count:14}),[lastNote,setLastNote]=useState(null);
+  const [homeReady,setHomeReady]=useState(false),[layout,setLayout]=useState({rows:2,low:3,count:14}),[lastNote,setLastNote]=useState(null);
+  const [modelEnabled,setModelEnabled]=useState(false),[modelState,setModelState]=useState('off'),[modelAttempt,setModelAttempt]=useState(0);
+  const posterHost=useRef(null),poster=useRef(null),modelResource=useRef(null);
+  if(!modelResource.current)modelResource.current=new ModelResource();
   const [filter,setFilter]=useState('全部'),[settings,setSettings]=useState(false),[part,setPart]=useState('overview'),[cut,setCut]=useState(false);
   const [arrivalAudio,setArrivalAudio]=useState('pending'),[works,setWorks]=useState(readWorks),[recording,setRecording]=useState(false),[elapsed,setElapsed]=useState(0),[recordCount,setRecordCount]=useState(0),[notice,setNotice]=useState('');
   const [scoreSide,setScoreSide]=useState('right'),[showScore,setShowScore]=useState(true),[splitFraction,setSplitFraction]=useState(.72);
@@ -150,12 +155,14 @@ function App(){
     playStage(events,{follow:true,beatMs:60000/next.bpm/rate,onTarget:(e,i)=>{engine.current?.setCue(200);update({index:i,feedback:tr`跟着拍点，敲 ${pitchLabel(e.midi)}。`});},onTick:tick=>{if(tick.countIn)update({feedback:tr`预备 ${tick.countIn} · 听拍点，准备落槌。`});},onEnd:()=>update({phase:'done',index:notes.length,feedback:t('这一句已结束。可以再练一次，或继续下一句。')})});
   }
   function audition(midi){audio.current.strike(midi).catch(()=>update({feedback:t('声音尚未开启，请再轻点一次。')}));}
-  function homeTone(region){if(viewer.current?.mesh)viewer.current.strike(region);else{audition(region==='center'?60:64);homeStrike({region,midi:region==='center'?60:64});}}
+  function homeTone(region){if(homeReady&&viewer.current?.mesh)viewer.current.strike(region);else if(poster.current)poster.current.strike(region);else{audition(region==='center'?60:64);homeStrike({region,midi:region==='center'?60:64});}}
   function homeStrike(event){setHomeLast(event);setHeard(s=>({...s,[event.region==='center'?'center':'side']:true}));}
   async function replayArrival(){
     if(hint.current)hint.current.hidden=true;
     update({muted:false});audio.current.setMuted(false);
-    try{await audio.current.unlock();setArrivalAudio('pending');viewer.current?.replayArrival();}catch{setArrivalAudio('blocked');notify(t('声音暂未开启，请检查浏览器声音设置。'));}
+    const scene=homeReady?viewer.current:poster.current;setArrivalAudio('pending');
+    try{await audio.current.unlock();}catch{setArrivalAudio('blocked');notify(t('声音暂未开启，请检查浏览器声音设置。'));}
+    finally{scene?.replayArrival();}
   }
   function playWork(work){
     stop();finishRecording();audio.current.unlock().catch(()=>{});
@@ -184,25 +191,38 @@ function App(){
     setSplitFraction(value=>event.key==='Home'?.72:clampSplitFraction(value+(event.key==='ArrowRight'?1:-1)*(scoreSide==='right'?1:-1)*.025));
   }
 
+  function projectHome(scene){
+    const mark=hint.current;if(!mark||live.current.view!=='home')return;
+    if(scene.arriving){mark.hidden=true;return;}
+    const seen=heardLive.current,region=!seen.center?'center':!seen.side?'left':null;
+    mark.hidden=!region||!!scene.camera&&scene.camera.position.z<0;if(!region)return;
+    const point=scene.strikeProjection(region);mark.style.left=`${point.x}px`;mark.style.top=`${point.y}px`;mark.textContent=region==='center'?t('轻敲中央'):t('再试侧边');
+  }
   useEffect(()=>{
     const type=state.view;if(!['home','observe'].includes(type))return;
-    setHomeReady(false);setModelError(false);setCut(false);let cancelled=false,scene;
-    import('./home-bell-scene.mjs').then(({HomeBellScene})=>{
-      if(cancelled)return;
-      scene=new HomeBellScene(homeHost.current,{audio:audio.current,purpose:type==='home'?'audition':'inspect',intro:!introSeen.current,
-      onStrike:homeStrike,onContext:ready=>{if(!cancelled){setHomeReady(ready);setModelError(!ready);}},onInspect:id=>setPart(id),
-      onArrivalAudio:status=>{if(!cancelled)setArrivalAudio(status);},
-      onProject:scene=>{
-        const mark=hint.current;if(!mark||type!=='home')return;
-        if(scene.arriving){mark.hidden=true;return;}
-        const seen=heardLive.current,region=!seen.center?'center':!seen.side?'left':null;
-        mark.hidden=!region||scene.camera.position.z<0;if(!region)return;
-        const point=scene.strikeProjection(region);
-        mark.style.left=`${point.x}px`;mark.style.top=`${point.y}px`;mark.textContent=region==='center'?t('轻敲中央'):t('再试侧边');
-      }});viewer.current=scene;return scene.ready;
-    }).then(()=>{if(!cancelled){introSeen.current=true;setHomeReady(true);if(type==='observe')scene.selectPart(partLive.current,true);}}).catch(()=>{if(!cancelled){setModelError(true);setHomeReady(false);}});
-    return()=>{cancelled=true;scene?.dispose();viewer.current=null;};
+    const scene=new Home2DScene(posterHost.current,{audio:audio.current,purpose:type==='home'?'audition':'inspect',intro:type==='home'&&!introSeen.current,onStrike:homeStrike,onInspect:id=>setPart(id),onProject:projectHome,onArrivalAudio:setArrivalAudio});
+    poster.current=scene;if(type==='home')introSeen.current=true;if(type==='observe')scene.setPart(partLive.current);
+    return()=>{scene.dispose();poster.current=null;};
   },[state.view]);
+  useEffect(()=>{
+    setHomeReady(false);setCut(false);viewer.current=null;
+    if(!modelEnabled){modelResource.current.cancel();setModelState('off');return;}
+    setModelState('loading');
+    if(!['home','observe'].includes(state.view)){
+      let cancelled=false;modelResource.current.load().catch(()=>{if(!cancelled)setModelState('error');});
+      return()=>{cancelled=true;};
+    }
+    const type=state.view;
+    const attempt=mountModel({host:homeHost.current,resource:modelResource.current,
+      createScene:(HomeBellScene,bytes,onError)=>new HomeBellScene(homeHost.current,{audio:audio.current,bytes,onError,purpose:type==='home'?'audition':'inspect',intro:false,onStrike:homeStrike,onContext:ready=>{if(!ready)onError(new Error('WebGL context lost'));},onInspect:id=>setPart(id),onArrivalAudio:setArrivalAudio,onProject:projectHome}),
+      onState:(status,scene)=>{
+        setModelState(status);setHomeReady(status==='ready');viewer.current=scene||null;poster.current?.setVisible(status!=='ready');
+        if(scene){scene.setInteractive(true);if(type==='observe')scene.selectPart(partLive.current,true);}
+      },
+    });
+    return()=>{attempt.dispose();viewer.current=null;poster.current?.setVisible(true);};
+  },[modelEnabled,modelAttempt,state.view]);
+  useEffect(()=>{poster.current?.setPart(state.view==='observe'?part:theme==='cavity'?'cavity':'overview');},[part,theme,state.view]);
   useEffect(()=>{
     if(state.view!=='play')return;
     const scene=new PerformanceScene(playHost.current,{audio:audio.current,onStrike:handleStrike,onMessage:text=>update({feedback:text}),onInterrupt:interrupt,onMeasure:info=>{
@@ -215,7 +235,7 @@ function App(){
     return()=>{scene.dispose();engine.current=null;};
   },[state.view]);
   useEffect(()=>{engine.current?.setOptions({startOctave:state.low,labels:state.labels,muted:state.muted,focusTarget:active});engine.current?.setTarget(target?.midi??null);engine.current?.setCue(350);},[state.low,state.labels,state.muted,state.phase,state.index,state.bar,state.paused,layout.count]);
-  useEffect(()=>{engine.current?.setOptions({noteStyle,locale:language});viewer.current?.refreshLanguage();},[noteStyle,language]);
+  useEffect(()=>{engine.current?.setOptions({noteStyle,locale:language});viewer.current?.refreshLanguage();poster.current?.refreshLanguage();},[noteStyle,language]);
   useEffect(()=>{const d=homeMoreDialog.current;if(homeMore&&!d.open)d.showModal();else if(!homeMore&&d.open)d.close();},[homeMore]);
   useEffect(()=>{audio.current.setMuted(state.muted);},[state.muted]);
   useEffect(()=>activateSoundOnInteraction(audio.current,document,()=>!live.current.muted&&!document.hidden),[]);
@@ -229,7 +249,7 @@ function App(){
   useEffect(()=>{if(!recording)return;const timer=setInterval(()=>{if(record.current&&record.current.first!==null){const length=performance.now()-record.current.first;setElapsed(length);if(length>=300000)finishRecording();}},200);return()=>clearInterval(timer);},[recording]);
   useEffect(()=>{const dialog=settingsDialog.current;if(settings&&!dialog.open)dialog.showModal();else if(!settings&&dialog.open)dialog.close();},[settings]);
   useEffect(()=>{const dialog=workDialog.current;if(workEdit&&!dialog.open){dialog.showModal();requestAnimationFrame(()=>workNameInput.current?.select());}else if(!workEdit&&dialog.open)dialog.close();},[!!workEdit]);
-  useEffect(()=>()=>{transport.current.stop();audio.current.dispose();clearTimeout(noticeTimer.current);},[]);
+  useEffect(()=>()=>{modelResource.current.cancel();transport.current.stop();audio.current.dispose();clearTimeout(noticeTimer.current);},[]);
 
   const contact=target&&engine.current?.layout?performanceContact(engine.current.layout,target.midi):null;
   const needsBank=target&&!pitchFitsBank(target.midi,layout.low,layout.rows),targetBank=target?practiceBank([target],layout.rows).low:state.low;
@@ -237,13 +257,14 @@ function App(){
   function selectPart(id){setPart(id);setCut(false);viewer.current?.setCutaway(false);viewer.current?.selectPart(id,true);}
   function observeTheme(key){setTheme(key);if(key==='cavity')selectPart('cavity');else if(key==='relief')selectPart('zhuan');else selectPart('overview');}
   function observeView(key){if(key==='front')viewer.current?.reset();if(key==='side')viewer.current?.viewSide();if(key==='cavity')observeTheme('cavity');}
+  const modelControl=h(ModelModeControl,{enabled:modelEnabled,status:modelState,onChange:setModelEnabled,onRetry:()=>{setModelEnabled(true);setModelAttempt(value=>value+1);}});
 
   return h('main',{className:`bell-app view-${state.view}`,'data-view':state.view,'data-phase':state.phase,'data-paused':state.paused,'data-step':state.index,'data-recording':recording,'data-work-count':works.length},
-    h(Header,{view:state.view,onLanguage:changeLanguage,onView:changeView,onMore:()=>setHomeMore(true),onSettings:()=>{interrupt('settings');setSettings(true);},context:state.workTitle||`${t(song.title)} · ${state.bar+1}/${measures.length}`,feedback:recording?tr`录制中 · ${formatTime(elapsed)} · ${recordCount} 次落槌`:state.paused?t('已暂停 · 继续时接着敲'):state.feedback}),
+    h(Header,{view:state.view,modelControl:['home','observe'].includes(state.view)?modelControl:null,onLanguage:changeLanguage,onView:changeView,onMore:()=>setHomeMore(true),onSettings:()=>{interrupt('settings');setSettings(true);},context:state.workTitle||`${t(song.title)} · ${state.bar+1}/${measures.length}`,feedback:recording?tr`录制中 · ${formatTime(elapsed)} · ${recordCount} 次落槌`:state.paused?t('已暂停 · 继续时接着敲'):state.feedback}),
     state.view==='home'&&h('section',{className:'home-screen','data-screen-label':t('双音入门首页')},
       h('div',{className:'home-hall','aria-hidden':true}),h('div',{className:'home-layout'},h(HomeTitle),
-        h('div',{className:'home-object','data-ready':homeReady},h('div',{className:'home-canvas-host',ref:homeHost}),!homeReady&&h('p',{className:'model-loading',role:'status'},modelError?t('3D 暂不可用，仍可试听与演奏。'):t('正在启钟…')),modelError&&h('img',{className:'fallback-bell',src:'./assets/images/bell-medium-v2.webp',alt:t('编钟备用图')})),
-        h(HomeGuide,{heard,last:homeLast,onTone:homeTone,onStart:startFirst,onFree:()=>changeView('play'),onObserve:()=>{setPart('overview');changeView('observe');}}),
+        h('div',{className:'home-object','data-ready':homeReady,'data-model-state':modelState,'data-render-mode':homeReady?'3d':'2d'},h('div',{className:'home-2d-host',ref:posterHost}),h('div',{className:'home-canvas-host',ref:homeHost,'data-visible':homeReady})),
+        h(HomeGuide,{heard,last:homeLast,threeD:homeReady,onTone:homeTone,onStart:startFirst,onFree:()=>changeView('play'),onObserve:()=>{setPart('overview');changeView('observe');}}),
         h(HomeStudy,{theme,onTheme:setTheme,onZoom:n=>viewer.current?.zoomBy(n),onReset:()=>viewer.current?.reset(),onObserve:()=>{setPart('overview');changeView('observe');},ready:homeReady,arrivalAudio,onArrival:replayArrival,volume,onVolume:setVolume})),h('span',{className:'home-hit-hint',ref:hint,hidden:true,'aria-hidden':true})),
     state.view==='play'&&h('section',{className:'play-page','data-screen-label':t('看谱与逐句跟奏')},
       h('div',{className:'play-topline'},h('div',null,h('h1',null,state.workTitle||t(song.title)),h('p',null,state.phase==='work'?t('本地作品回放'):`${t(measure.label)} · ${recording?t('录制中'):state.phase==='listen'?(state.paused?t('试听已暂停'):t('试听中')):state.phase==='wait'?t('等敲对再继续'):state.phase==='timed'?t('跟着节拍'):t('自由演奏')}${song.transcriptionStatus?t(' · 转谱初稿'):''}`)),h('div',{className:'play-layout-controls'},h(BankPicker,{low:layout.low,rows:layout.rows,onBank:low=>update({low}),disabled:['listen','timed','work'].includes(state.phase)}))),
@@ -255,7 +276,7 @@ function App(){
     state.view==='library'&&h(LibraryPage,{songs,selected:song,filter,onFilter:setFilter,onSelect:next=>selectSong(next),onStart:start,onListen:listenSong,onAudition:audition,onSource:stop,onBar:(next,bar)=>{selectSong(next,bar);update({view:'play'});location.hash='play';}}),
     state.view==='works'&&h(WorksPage,{works,onPlay:playWork,onRecord:()=>changeView('play'),onRename:work=>setWorkEdit({kind:'rename',work,value:work.title,error:''}),onSave:()=>notify(saveWorks(works)?t('本地作品已保存。'):t('保存失败，请检查浏览器存储空间。'))}),
     state.view==='observe'&&h('section',{className:'observe-page home-screen','data-screen-label':t('单钟结构观赏')},
-      h('div',{className:'home-object observe-object','data-ready':homeReady},h('div',{className:'home-canvas-host',ref:homeHost}),!homeReady&&h('p',{className:'model-loading',role:'status'},modelError?t('3D 暂不可用，可继续阅读结构说明。'):t('正在载入单钟…'))),
+      h('div',{className:'home-object observe-object','data-ready':homeReady,'data-model-state':modelState,'data-render-mode':homeReady?'3d':'2d'},h('div',{className:'home-2d-host',ref:posterHost}),h('div',{className:'home-canvas-host',ref:homeHost,'data-visible':homeReady})),
       h(ObservePanel,{part,onPart:selectPart,theme,onTheme:observeTheme,onBack:()=>changeView('play'),onCompare:()=>changeView('home'),onView:observeView,onZoom:n=>viewer.current?.zoomBy(n),onCut:()=>{viewer.current?.setCutaway(!cut);if(!cut)viewer.current?.viewCutaway();setCut(!cut);},cut,ready:homeReady})),
     h('dialog',{className:'settings-dialog',ref:settingsDialog,onCancel:()=>setSettings(false),'aria-label':t('练习设置')},h('header',null,h('h2',null,t('练习设置')),h('button',{className:'icon-button','aria-label':t('关闭练习设置'),onClick:()=>setSettings(false)},h(Icon,{name:'close'}))),
       h('label',{className:'setting-row'},h('span',null,t('练习方式')),h('select',{'aria-label':t('练习方式'),value:state.mode,onChange:e=>{stop();update({mode:e.target.value,phase:'free',paused:false,index:0,feedback:t('练习方式已切换，准备好后开始。')});}},h('option',{value:'wait'},t('等敲对再继续')),h('option',{value:'timed'},t('跟着节拍')))),
@@ -269,7 +290,7 @@ function App(){
     h('dialog',{className:'home-more-dialog',ref:homeMoreDialog,onCancel:()=>setHomeMore(false),'aria-labelledby':'home-more-title'},
       h('header',null,h('h2',{id:'home-more-title'},t('更多')),h('button',{className:'icon-button','aria-label':t('关闭更多选项'),onClick:()=>setHomeMore(false)},h(Icon,{name:'close'}))),
       h('label',{className:'sheet-volume'},h('span',null,t('钟声音量')),h('input',{type:'range',min:0,max:100,value:Math.round(volume*100),'aria-label':t('钟声音量'),onChange:e=>setVolume(Number(e.target.value)/100)}),h('output',null,`${Math.round(volume*100)}%`)),
-      h('button',{className:'sheet-row',disabled:!homeReady,onClick:()=>{setHomeMore(false);replayArrival();}},h(Icon,{name:'sound'}),t('重听落钟'),h('span',null,'›')),
+      h('button',{className:'sheet-row',onClick:()=>{setHomeMore(false);replayArrival();}},h(Icon,{name:'sound'}),t('重听落钟'),h('span',null,'›')),
       h('div',{className:'sheet-audition'},h('button',{className:'secondary',onClick:()=>homeTone('center')},t('听中央')),h('button',{className:'secondary',onClick:()=>homeTone('left')},t('听侧边'))),
       [['library',t('乐谱'),'book'],['works',t('我的钟曲'),'home'],['observe',t('观赏钟体'),'eye'],['play',t('自由演奏'),'play']].map(([view,label,icon])=>h('button',{key:view,className:'sheet-row',onClick:()=>{setHomeMore(false);changeView(view);}},h(Icon,{name:icon}),label,h('span',null,'›')))),
     h('dialog',{className:'work-name-dialog',ref:workDialog,onCancel:event=>{event.preventDefault();closeWorkName();},'aria-labelledby':'work-name-heading'},workEdit&&h('form',{onSubmit:commitWorkName},

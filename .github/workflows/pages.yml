@@ -17,7 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -41,13 +41,16 @@ jobs:
           node versions/r15/test-recording-score.mjs
           node versions/r15/test-workspace.mjs
       - name: Validate the bilingual current app
+        run: npm test
+      - name: Install browser regression tools
         run: |
-          node tests/i18n.mjs
-          node tests/current-model.mjs
-          node tests/home-arrival.mjs
-          node tests/mobile-viewport.mjs
-          node tests/practice.mjs
-          node tests/workspace.mjs
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Validate browser interactions and loading failures
+        env:
+          YIMING_REQUIRE_BROWSERS: '1'
+          YIMING_QA_DIR: ${{ runner.temp }}/yiming-browser-qa
+        run: npm run test:browser
       - name: Build the allowlisted static site
         run: node scripts/build-pages.mjs
       - name: Check the generated release

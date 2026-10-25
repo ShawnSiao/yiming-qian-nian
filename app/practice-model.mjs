@@ -1,10 +1,10 @@
 import {scoreMeasures} from './score-workspace.mjs';
-import {isPairedPitch} from './paired-instrument.mjs';
+import {pitchFitsBank} from './paired-instrument.mjs';
 
 export function measuresFor(song){return scoreMeasures(song).map(m=>({...m,notes:m.notes.filter(n=>Number.isInteger(n.midi)&&!n.tie)}));}
 export function practiceBank(notes,rows=2){
-  const midis=notes.map(n=>n.midi),min=Math.min(...midis),max=Math.max(...midis);
-  for(let low=3;low<=7-rows;low++)if(min>=(low+1)*12&&max<=(low+rows+1)*12)return {low,fits:midis.every(isPairedPitch)};
+  const midis=notes.map(n=>n.midi),min=Math.min(...midis);
+  for(let low=3;low<=7-rows;low++)if(midis.every(midi=>pitchFitsBank(midi,low,rows)))return {low,fits:true};
   return {low:Math.max(3,Math.min(7-rows,Math.floor(min/12)-1)),fits:false};
 }
 export function practiceHit({index,notes,paused=false,phase},midi){

@@ -76,7 +76,7 @@ export function bellNoteTags(layout,bell) {
     }).filter(t=>t.region!=='left'||t.width*2+8<=bell.cellWidth);
   }
   return [['center',bell.data.centerName],['left',bell.data.sideName],['right',bell.data.sideName]].map(([region,text])=>{
-    const isCenter=region==='center',fontSize=isCenter?(layout.mobile?13.5:14):(layout.mobile?12:12.5);
+    const isCenter=region==='center',fontSize=isCenter?(layout.mobile?15:16):(layout.mobile?13:14);
     const width=Math.max(region==='center'?22:18,Math.ceil(text.length*fontSize*.60+7));
     const height=fontSize+(region==='center'?5:4);
     const sign=region==='left'?-1:1,cornerX=bell.cx+sign*bell.width*.43,cornerY=bell.y+bell.height*.96;

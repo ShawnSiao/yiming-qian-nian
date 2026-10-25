@@ -5,13 +5,15 @@ import { validateTargets } from './model.mjs';
 import { performanceLayout, performanceLayoutChanged, findPerformanceHit, performanceContact, bellNoteTags, resolveTargetPointer } from './performance-layout.mjs';
 import {STRIKE_FEEDBACK_MS,malletFeedback} from './strike-feedback.mjs';
 import {registerLabel,registerMark} from './paired-instrument.mjs';
+import {loadBellImage} from './image-resource.mjs';
+import {drawBellPlaceholder} from './bell-placeholder.mjs';
 
-const IMAGE_SOURCES={top:'bell-small-v2.webp',middle:'bell-medium-v2.webp',bottom:'bell-large-v2.webp',mallet:'bell-mallet-v10.webp'};
+const IMAGE_KEYS=['top','middle','bottom','mallet'];
 const GOLD='#c6aa68',RICE='#eee2c7';
 
 // Adapted from main@20b716d assets/app.js drawNoteBadge, not a DOM button.
 // Preserve its clipped copper edges, inset rim, small eyelet and patinated
-// fill. Only text opacity/size and the quiet outline are lifted for clarity.
+// fill. Open letterforms keep c/e distinct while the plaque shape stays intact.
 export function drawNotePlaque(ctx,tag,highlighted=false){
   const {x:left,y:top,width,height,fontSize,text,region}=tag;
   if(tag.variant==='pair'){
@@ -33,7 +35,7 @@ export function drawNotePlaque(ctx,tag,highlighted=false){
     ctx.restore();return;
   }
   const x=left+width/2,y=top+height/2,isCenter=region==='center',cut=isCenter?3.2:height*.34;
-  ctx.save();ctx.font=`700 ${fontSize}px Georgia,serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.save();ctx.font=`600 ${fontSize}px Arial,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.strokeStyle=highlighted?'rgba(224,199,125,.82)':'rgba(117,100,59,.65)';ctx.lineWidth=.7;
   if(!isCenter&&Number.isFinite(tag.anchorX)){ctx.beginPath();ctx.moveTo(tag.anchorX,tag.anchorY-2);ctx.lineTo(x,top-2);ctx.stroke();ctx.beginPath();ctx.arc(tag.anchorX,tag.anchorY-2,1.5,0,Math.PI*2);ctx.stroke();}
   ctx.beginPath();ctx.moveTo(x-2.5,top);ctx.lineTo(x-2.5,top-(isCenter?3:2));ctx.lineTo(x+2.5,top-(isCenter?3:2));ctx.lineTo(x+2.5,top);ctx.stroke();
@@ -85,12 +87,22 @@ export class PerformanceScene {
     this.handleHidden=()=>{if(document.hidden){this.cancelInput(true);this.onInterrupt('hidden');}else this.invalidate();};
     window.addEventListener('keydown',this.handleKey);window.addEventListener('blur',this.handleBlur);document.addEventListener('visibilitychange',this.handleHidden);
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(host);this.resize();
-    this.ready=Promise.all(Object.entries(IMAGE_SOURCES).map(async([key,file])=>{
-      const img=new Image();img.decoding='async';img.src=new URL(`./assets/images/${file}`,import.meta.url).href;await img.decode();
-      // Brighten once, not via a costly per-bell filter on every frame.
-      const cached=document.createElement('canvas');cached.width=img.naturalWidth;cached.height=img.naturalHeight;
-      const ctx=cached.getContext('2d');ctx.filter=key==='mallet'?'brightness(1.12)':'brightness(1.28) contrast(1.04)';ctx.drawImage(img,0,0);this.images[key]=cached;
-    })).then(()=>{if(!this.disposed)this.invalidate();});
+    this.imageFailures=new Set();this.retry=document.createElement('button');this.retry.className='asset-retry';this.retry.type='button';this.retry.textContent=t('重试图片');this.retry.hidden=true;
+    this.retry.onclick=()=>this.loadImages([...this.imageFailures]);this.surface.append(this.retry);
+    this.assetsReady=this.loadImages(IMAGE_KEYS);
+    // The local placeholder is already playable; a slow image cannot block music.
+    this.ready=Promise.resolve(this);
+  }
+  loadImages(keys){
+    this.retry.disabled=true;
+    return Promise.allSettled(keys.map(async key=>{
+      try{
+        const {image:img,url}=await loadBellImage(key);if(this.disposed)return;
+        const cached=document.createElement('canvas');cached.width=img.naturalWidth;cached.height=img.naturalHeight;
+        const ctx=cached.getContext('2d');ctx.filter=key==='mallet'?'brightness(1.12)':'brightness(1.28) contrast(1.04)';ctx.drawImage(img,0,0);this.images[key]=cached;this.imageFailures.delete(key);
+        this.surface.dataset[key+'Source']=url.split('/').pop();this.invalidate();
+      }catch{if(!this.disposed)this.imageFailures.add(key);}
+    })).then(()=>{if(!this.disposed){this.retry.disabled=false;this.retry.hidden=!this.imageFailures.size;this.surface.dataset.assetErrors=String(this.imageFailures.size);this.invalidate();}});
   }
   canPlay(){return this.options.active&&!document.hidden&&!this.disposed&&!!this.layout;}
   capture(event,element){try{element.setPointerCapture(event.pointerId);}catch{}this.pointers.set(event.pointerId,element);this.publish();}
@@ -99,6 +111,7 @@ export class PerformanceScene {
   setOptions(next){
     const before=this.options;this.options={...before,...next};
     if(before.locale!==this.options.locale)this.canvas.setAttribute('aria-label',t('编钟钟面，中央正鼓、左右侧鼓'));
+    if(this.retry)this.retry.textContent=t('重试图片');
     this.audio.setMuted(this.options.muted);
     this.surface.hidden=!this.options.active;
     if(before.active!==this.options.active)this.cancelInput(true);
@@ -189,6 +202,7 @@ export class PerformanceScene {
       ctx.save();ctx.translate(bell.cx,bell.y);ctx.rotate(swing);ctx.translate(-bell.cx,-bell.y);
       if(this.options.focusTarget&&this.target!=null&&bell.data.centerMidi!==this.target&&bell.data.sideMidi!==this.target&&!effect)ctx.globalAlpha=.82;
       if(image){const s=Math.min(bell.width/image.width,bell.height/image.height);ctx.drawImage(image,bell.cx-image.width*s/2,bell.y,image.width*s,image.height*s);}
+      else drawBellPlaceholder(ctx,bell);
       if(this.options.labels)for(const tag of bellNoteTags(this.layout,bell)){
         const highlighted=!!effect&&age<330&&(tag.region==='center'?effect.region==='center':effect.region!=='center');
         drawNotePlaque(ctx,tag,highlighted);
@@ -206,9 +220,10 @@ export class PerformanceScene {
     ctx.strokeStyle=GOLD;ctx.lineWidth=2.2;ctx.beginPath();ctx.arc(x,y,this.reduced?14:10+age*27,0,Math.PI*2);ctx.stroke();
     ctx.strokeStyle=RICE;ctx.lineWidth=1.4;ctx.beginPath();for(let p=-28;p<=28;p+=2){const yy=y+Math.sin(p*.35-age*8)*6*(1-Math.abs(p)/32)*fade;p===-28?ctx.moveTo(x+p,yy):ctx.lineTo(x+p,yy);}ctx.stroke();
     const mallet=this.images.mallet;
-    if(!this.reduced&&showMallet&&mallet&&feedback.alpha>0){
-      const side=effect.region==='left'?-1:1,{height:h,recoil,alpha}=feedback,w=mallet.width/mallet.height*h;
-      ctx.globalAlpha=alpha;ctx.translate(x+side*recoil*16,y+recoil*18);ctx.rotate(side*recoil*.13);ctx.drawImage(mallet,-w/2,-h*.14,w,h);
+    if(!this.reduced&&showMallet&&feedback.alpha>0){
+      const side=effect.region==='left'?-1:1,{height:h,recoil,alpha}=feedback,w=143/640*h;
+      ctx.globalAlpha=alpha;ctx.translate(x+side*recoil*16,y+recoil*18);ctx.rotate(side*recoil*.13);
+      if(mallet)ctx.drawImage(mallet,-w/2,-h*.14,w,h);else{ctx.fillStyle=GOLD;ctx.fillRect(-w/2,-h*.05,w,h*.1);ctx.fillRect(-3,0,6,h*.7);}
     }
     ctx.restore();
   }

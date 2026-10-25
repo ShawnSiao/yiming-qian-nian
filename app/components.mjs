@@ -14,14 +14,15 @@ const iconPaths={
   mute:'M11 4 5 9H2v6h3l6 5V4M16 9l6 6M22 9l-6 6',
   home:'M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9',
   menu:'M4 6h16M4 12h16M4 18h16',
+  cube:'M12 3 3 8v9l9 5 9-5V8l-9-5M3 8l9 5 9-5M12 13v9',
 };
 export function Icon({name}){return h('svg',{viewBox:'0 0 24 24',width:18,height:18,fill:'none',stroke:'currentColor',strokeWidth:1.6,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true},h('path',{d:iconPaths[name]||iconPaths.play}));}
-export function Header({view,onView,onSettings,onMore,onLanguage,context,feedback}){
+export function Header({view,onView,onSettings,onMore,onLanguage,context,feedback,modelControl}){
   return h('header',{className:'app-header'},
     h('button',{className:'brand',onClick:()=>onView('home'),'aria-label':t('返回首页')},h(Icon,{name:'home'}),h('span',null,t('先秦礼乐 · 数字演奏')),h('strong',null,t('一鸣千年'))),
     h('nav',{'aria-label':t('主导航')},[['play',t('演奏')],['library',t('乐谱')],['observe',t('观赏')],['works',t('我的')]].map(([id,label])=>h('button',{key:id,onClick:()=>onView(id),'aria-current':view===id?'page':undefined},label))),
     view==='play'&&h('p',{className:'compact-play-context','aria-live':'polite'},h('span',null,context),h('strong',null,feedback)),
-    h('div',{className:'header-tools'},h('button',{className:'quiet language-toggle',onClick:onLanguage,'aria-label':getLocale()==='en'?'Switch to Chinese':'切换为英文',title:getLocale()==='en'?'Switch to Chinese':'切换为英文'},getLocale()==='en'?'中文':'EN'),view==='home'&&h('button',{className:'icon-button home-more-entry',onClick:onMore,'aria-label':t('更多选项')},h(Icon,{name:'menu'})),view==='play'&&h('button',{className:'quiet settings-entry',onClick:onSettings,'aria-label':t('练习设置')},t('练习设置'))));
+    h('div',{className:'header-tools'},modelControl,h('button',{className:'quiet language-toggle',onClick:onLanguage,'aria-label':getLocale()==='en'?'Switch to Chinese':'切换为英文',title:getLocale()==='en'?'Switch to Chinese':'切换为英文'},getLocale()==='en'?'中文':'EN'),view==='home'&&h('button',{className:'icon-button home-more-entry',onClick:onMore,'aria-label':t('更多选项')},h(Icon,{name:'menu'})),view==='play'&&h('button',{className:'quiet settings-entry',onClick:onSettings,'aria-label':t('练习设置')},t('练习设置'))));
 }
 export const homeThemes={
   relief:{label:'纹饰',text:'钟乳与带状纹饰沿钟身排列，转动可以看见浮雕层次。'},
@@ -29,7 +30,12 @@ export const homeThemes={
   rack:{label:'钟架',text:'钟悬在铜木结构的架上；一组七口是本页的现代演奏编排。'},
 };
 export function HomeTitle(){return h('div',{className:'home-title'},h('p',{className:'eyebrow'},t('先秦礼乐 · 数字演奏')),h('h1',null,getLocale()==='en'?'A Thousand Echoes':t('一鸣千年')),h('p',{className:'home-lead'},t('一口钟，两种声音。')));}
-export function HomeGuide({heard,last,onTone,onStart,onFree,onObserve}){
+export function ModelModeControl({enabled,status,onChange,onRetry}){
+  return h('div',{className:'model-mode-controls'},h('button',{type:'button',className:'quiet model-switch',role:'switch','aria-label':t('3D 展示'),'aria-checked':enabled,'data-enabled':enabled,title:t(enabled?'关闭 3D 展示':'开启 3D 展示'),onClick:()=>onChange(!enabled)},h(Icon,{name:'cube'}),h('span',null,'3D')),
+    status==='loading'&&h('span',{className:'model-state',role:'status'},t('准备中…')),
+    ['error','unsupported'].includes(status)&&h('span',{className:'model-state',role:'status'},t(status==='unsupported'?'3D 不可用':'3D 未就绪'),h('button',{className:'text-button',onClick:onRetry},t('重试'))));
+}
+export function HomeGuide({heard,last,onTone,onStart,onFree,onObserve,threeD=false}){
   const complete=heard.center&&heard.side;
   const title=complete?t('同一口钟，听见了两种音高。'):heard.center?t('再试试任一侧边，听听有什么不同。'):t('先敲中央，再试试两侧。');
   return h('div',{className:'home-guide','data-complete':complete},
@@ -38,16 +44,16 @@ export function HomeGuide({heard,last,onTone,onStart,onFree,onObserve}){
     h('div',{className:'audition-steps','aria-label':t('比较一钟双音')},
       h('button',{className:heard.center?'audition done':'audition',onClick:()=>onTone('center')},h('span',{className:'step-mark'},heard.center?h(Icon,{name:'check'}):t('壹')),h('span',null,t('听中央')),h('strong',null,pitchLabel(60))),
       h('button',{className:heard.side?'audition done':'audition',onClick:()=>onTone('left')},h('span',{className:'step-mark'},heard.side?h(Icon,{name:'check'}):t('贰')),h('span',null,t('听侧边')),h('strong',null,pitchLabel(64)))),
-    h('p',{className:'home-feedback','aria-live':'polite'},last?`${last.region==='center'?t('中央正鼓'):t('侧鼓')} · ${pitchLabel(last.midi)}${complete?t(' · 现在试着敲一句'):''}`:t('轻点钟面试听，按住钟体拖动旋转。')),
+    h('p',{className:'home-feedback','aria-live':'polite'},last?`${last.region==='center'?t('中央正鼓'):t('侧鼓')} · ${pitchLabel(last.midi)}${complete?t(' · 现在试着敲一句'):''}`:t(threeD?'轻点钟面试听，按住钟体拖动旋转。':'轻点钟面试听。')),
     h('div',{className:'home-actions'},h('button',{className:'primary',onClick:onStart},h('span',null,t('叁')),h('b',{className:'desktop-start-label'},t('跟敲第一句')),h('b',{className:'mobile-start-label'},t('开始演奏')),h(Icon,{name:'play'})),h('button',{className:'text-button free-entry',onClick:onFree},t('自由演奏'))),
     h('button',{className:'text-button mobile-observe-entry',onClick:onObserve},t('观赏细节'),h(Icon,{name:'eye'})));
 }
 export function HomeStudy({theme,onTheme,onZoom,onReset,onObserve,ready,arrivalAudio,onArrival,volume,onVolume}){
   return h('aside',{className:'home-study','aria-label':t('单钟观察')},
     h('div',{className:'home-study-top'},h('div',{className:'theme-tabs','aria-label':t('观察主题')},Object.entries(homeThemes).map(([key,topic])=>h('button',{key,'aria-pressed':theme===key,onClick:()=>onTheme(key)},t(topic.label)))),
-      h('div',{className:'view-tools','aria-label':t('模型视角')},h('button',{'aria-label':t('缩小编钟'),disabled:!ready,onClick:()=>onZoom(.84)},'−'),h('button',{'aria-label':t('放大编钟'),disabled:!ready,onClick:()=>onZoom(1.19)},'+'),h('button',{onClick:onReset,disabled:!ready},t('正面')))),
-    h('p',{'aria-live':'polite'},t(homeThemes[theme].text)),
-    h('div',{className:'study-links'},h('button',{className:'study-link',onClick:onObserve},t('观察钟体结构'),h(Icon,{name:'eye'})),h('div',{className:'home-audio-tools'},h('div',{className:'arrival-sound'},h('button',{className:'text-button',disabled:!ready,onClick:onArrival,'aria-label':t('重听落钟声')},h(Icon,{name:'sound'}),t('重听落钟'))),h('label',{className:'home-volume'},h('span',null,t('音量')),h('input',{type:'range',min:0,max:100,step:1,value:Math.round(volume*100),'aria-label':t('首页钟声音量'),'aria-valuetext':`${Math.round(volume*100)}%`,onChange:e=>onVolume(Number(e.target.value)/100)}),h('output',null,`${Math.round(volume*100)}%`)))));
+      ready&&h('div',{className:'view-tools','aria-label':t('模型视角')},h('button',{'aria-label':t('缩小编钟'),onClick:()=>onZoom(.84)},'−'),h('button',{'aria-label':t('放大编钟'),onClick:()=>onZoom(1.19)},'+'),h('button',{onClick:onReset},t('正面')))),
+    h('p',{'aria-live':'polite'},t(!ready&&theme==='relief'?'钟乳与带状纹饰沿钟身排列。':homeThemes[theme].text)),
+    h('div',{className:'study-links'},h('button',{className:'study-link',onClick:onObserve},t('观察钟体结构'),h(Icon,{name:'eye'})),h('div',{className:'home-audio-tools'},h('div',{className:'arrival-sound'},h('button',{className:'text-button',onClick:onArrival,'aria-label':t('重听落钟声')},h(Icon,{name:'sound'}),t('重听落钟'))),h('label',{className:'home-volume'},h('span',null,t('音量')),h('input',{type:'range',min:0,max:100,step:1,value:Math.round(volume*100),'aria-label':t('首页钟声音量'),'aria-valuetext':`${Math.round(volume*100)}%`,onChange:e=>onVolume(Number(e.target.value)/100)}),h('output',null,`${Math.round(volume*100)}%`)))));
 }
 export function Note({note,current=false,played=false,onAudition}){
   return h('button',{className:`score-note${current?' current':''}${played?' played':''}`,onClick:()=>onAudition(note.midi),'aria-current':current?'step':undefined,'aria-label':tr`试听简谱 ${note.accidental||''}${note.degree}，音名 ${pitchLabel(note.midi)}，${note.duration} 拍${note.uncertain?t('，待核对'):''}`},
@@ -97,7 +103,7 @@ export function LibraryPage({songs,selected,filter,onFilter,onSelect,onStart,onL
   return h('section',{className:'library-page','data-screen-label':t('选曲与乐谱')},
     h('header',{className:'page-title'},h('p',{className:'eyebrow'},t('从熟悉的旋律开始')),h('h1',null,t('听一遍，再敲一句。')),h('p',null,t('先选一小段，找到亮起的击点。'))),
     h('div',{className:'library-layout'},h('div',{className:'library-main'},
-      h('section',{className:'first-piece','aria-label':t('第一次推荐')},h('p',{className:'eyebrow'},t('第一次试试')),h('div',null,h('div',null,h('h2',null,t('竹枝词 · 第一小节')),h('p',null,t('5 次落槌 · 两音组 · 先慢慢敲对'))),h('button',{className:'primary',onClick:()=>onStart(songs.find(s=>s.id==='zhuzhi-ci'),0)},t('开始第一句'),h(Icon,{name:'play'})))),
+      h('section',{className:'first-piece','aria-label':t('第一次推荐')},h('p',{className:'eyebrow'},t('第一次试试')),h('div',null,h('div',null,h('h2',null,t('竹枝词 · 第一小节')),h('p',null,t('5 次落槌 · 先慢慢敲对'))),h('button',{className:'primary',onClick:()=>onStart(songs.find(s=>s.id==='zhuzhi-ci'),0)},t('开始第一句'),h(Icon,{name:'play'})))),
       getLocale()==='en'&&h('details',{className:'notation-help'},h('summary',null,'Reading the numbered score'),h('p',null,'Numbers 1–7 are scale degrees; the key tells you the pitch of 1. Dots above or below move a note up or down an octave. Pitch names such as C4 show exactly which bell to strike.')),
       h('div',{className:'library-filters','aria-label':t('曲目分类')},['全部','入门','民间','熟悉旋律','流行'].map(x=>h('button',{key:x,'aria-pressed':filter===x,onClick:()=>onFilter(x)},t(x)))),
       h('div',{className:'song-list'},songs.filter(s=>filter==='全部'||s.category===filter).map((s,i)=>h('article',{key:s.id,className:selected.id===s.id?'song-row selected':'song-row'},h('span',{className:'song-number'},String(i+1).padStart(2,'0')),h('button',{className:'song-info',onClick:()=>onSelect(s),'aria-pressed':selected.id===s.id},h('strong',null,t(s.title)),h('span',null,`${t(s.category)} · ${formatTime(s.durationMs)} · ${measuresFor(s).length} ${s.jianpuBars?t('小节'):t('乐句')}`),s.transcriptionStatus&&h('em',null,t('录音转谱初稿'))),h('button',{className:'song-preview icon-button',onClick:()=>onListen(s),'aria-label':tr`试听${t(s.title)}`},h(Icon,{name:'play'})),h('button',{className:'text-button song-practice',onClick:()=>onStart(s,0)},t('逐句练习')),
@@ -110,10 +116,10 @@ export function ObservePanel({part,onPart,theme,onTheme,onBack,onCompare,onView,
   const info=part==='overview'?BELL_OVERVIEW:BELL_PARTS.find(x=>x.id===part)||BELL_OVERVIEW;
   return h('aside',{className:'observe-panel'},h('p',{className:'eyebrow'},t('从声音，认识一口甬钟')),h('h1',null,t('看见钟里的结构。')),
     h('div',{className:'theme-tabs'},[['relief',t('纹饰')],['cavity',t('钟腔')],['rack',t('钟架')]].map(([id,label])=>h('button',{key:id,'aria-pressed':theme===id,onClick:()=>onTheme(id)},label))),
-    h('p',{className:'observe-intro'},theme==='rack'?t('背景钟架展示悬挂场景；本页的七钟音组是现代演奏编排。'):t(homeThemes[theme].text)),
+    h('p',{className:'observe-intro'},theme==='rack'?t('背景钟架展示悬挂场景；本页的七钟音组是现代演奏编排。'):t(!ready&&theme==='relief'?'钟乳与带状纹饰沿钟身排列。':homeThemes[theme].text)),
     h('label',{className:'part-picker'},h('span',null,t('选择部位')),h('select',{'aria-label':t('选择编钟部位'),value:part,onChange:e=>onPart(e.target.value)},h('option',{value:'overview'},t('整体 · 甬钟')),BELL_PARTS.map(p=>h('option',{key:p.id,value:p.id},`${t(p.name)} · ${t(p.reading)}`)))),
     h('article',{className:'part-explanation','aria-live':'polite'},h('p',{className:'eyebrow'},t(info.reading)),h('h2',null,t(info.name)),h('p',null,t(info.text)),info.note&&h('p',{className:'model-boundary'},t(info.note))),
-    h('div',{className:'observe-tools',role:'group','aria-label':t('模型视角与剖视')},h('button',{className:'secondary',disabled:!ready,'aria-label':t('恢复正面视角'),onClick:()=>onView('front')},t('正面')),h('button',{className:'secondary',disabled:!ready,'aria-label':t('查看编钟侧面'),onClick:()=>onView('side')},t('侧面')),h('button',{className:'secondary',disabled:!ready,'aria-label':t('从钟口观察内腔'),onClick:()=>onView('cavity')},t('钟腔')),h('button',{className:'secondary',disabled:!ready,'aria-pressed':cut,onClick:onCut},cut?t('关闭剖视'):t('剖视')),h('button',{className:'secondary',disabled:!ready,onClick:()=>onZoom(.84),'aria-label':t('缩小观赏模型')},'−'),h('button',{className:'secondary',disabled:!ready,onClick:()=>onZoom(1.19),'aria-label':t('放大观赏模型')},'+')),
+    ready&&h('div',{className:'observe-tools',role:'group','aria-label':t('模型视角与剖视')},h('button',{className:'secondary',disabled:!ready,'aria-label':t('恢复正面视角'),onClick:()=>onView('front')},t('正面')),h('button',{className:'secondary',disabled:!ready,'aria-label':t('查看编钟侧面'),onClick:()=>onView('side')},t('侧面')),h('button',{className:'secondary',disabled:!ready,'aria-label':t('从钟口观察内腔'),onClick:()=>onView('cavity')},t('钟腔')),h('button',{className:'secondary',disabled:!ready,'aria-pressed':cut,onClick:onCut},cut?t('关闭剖视'):t('剖视')),h('button',{className:'secondary',disabled:!ready,onClick:()=>onZoom(.84),'aria-label':t('缩小观赏模型')},'−'),h('button',{className:'secondary',disabled:!ready,onClick:()=>onZoom(1.19),'aria-label':t('放大观赏模型')},'+')),
     h('div',{className:'source-links'},h('span',null,t('资料出处')),(info.sources||[]).map(key=>STRUCTURE_SOURCES[key]).filter(Boolean).map(source=>h('a',{key:source.url,href:source.url,target:'_blank',rel:'noopener'},t(source.name),' ↗'))),
     h('p',{className:'model-boundary'},t('照片参考建模，非实物测绘；剖视为结构示意，未做声学模拟。')),h('div',{className:'observe-actions'},h('button',{className:'secondary',onClick:onCompare},t('返回双音试听')),h('button',{className:'primary',onClick:onBack},t('回到演奏'))));
 }

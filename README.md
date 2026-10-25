@@ -8,12 +8,12 @@ Explore a Chinese bronze chime bell, hear how one bell can produce two tones, an
 
 ## Play and explore
 
-- **Hear the difference.** Tap the center and either side of the large bell on the home screen. Drag to rotate, pinch to zoom and pan, or use the keyboard.
+- **Hear the difference.** Tap the center and either side of the large 2D bell on the home screen, or use Enter/Space and the left/right arrows. The lightweight entrance never blocks playing or navigation.
 - **Play a phrase.** Choose a score, hear a demonstration, then follow the highlighted striking area. Wait mode advances only after the correct note; timed mode follows a beat.
 - **Keep the bells playable on a phone.** The stage adapts between 7, 14 and 21 bells. Narrow portrait screens wrap each seven-bell register into two visual lines. Change the pitch range when a melody moves beyond the visible bells. Landscape provides more room.
 - **Read while playing.** Wide screens place a resizable score beside the bells. Phones retain a compact phrase strip beneath the stage.
 - **Save an idea.** Record your strikes, name the piece when saving, rename it later, and replay it from **Saved**. These are note-event recordings, not microphone recordings or audio files.
-- **Look inside.** Explore the single 3D bell, select structural parts, or open a cutaway. Explanations link to museum and research sources.
+- **Look inside.** Select structural parts in the observation page; the cavity has a pre-rendered section image. Turn on **3D** to rotate, zoom, pan or open a live cutaway. Explanations link to museum and research sources.
 
 The interface supports English and Simplified Chinese. A first visit follows the browser's supported language; the language button saves a preference. `?lang=en` and `?lang=zh` override it. Language changes preserve saved recordings and pause an active exercise at its current position.
 
@@ -29,13 +29,15 @@ Each register retains seven natural center notes, from C through B, with this mo
 | --- | --- |
 | C | E |
 | D | F |
-| E | E |
+| E | G |
 | F | F♯ |
 | G | B |
 | A | C in the next octave |
-| B | B |
+| B | D in the next octave |
 
-Selectable registers span **C3–B6**, with the highest A-bell side reaching **C7**. This mapping includes natural notes and F-sharp; it is **not a complete chromatic instrument**. Pitch pairs and seven-bell groups are an interaction design, not a reconstruction of the tuning of a particular excavated set.
+Selectable center notes span **C3–B6**; the highest A-bell side reaches **C7**, and the B-bell side reaches **D7**. Playability and automatic register changes follow the actual visible striking points. This mapping includes natural notes and F-sharp; it is **not a complete chromatic instrument**. Pitch pairs and seven-bell groups are an interaction design, not a reconstruction of the tuning of a particular excavated set.
+
+Existing recordings keep their saved MIDI pitches. Old E/E and B/B side strikes replay those original notes and highlight an appropriate center point; their stored events are not rewritten.
 
 ## Scores
 
@@ -49,6 +51,8 @@ The full version follows prominent strikes in an ensemble. It has not received e
 ## Sound, storage and model limits
 
 Sound is enabled by default, but browsers may require the first tap before starting audio. Use the volume control or replay the entrance after interacting. Performance tones and the entrance sound are synthesized, not recordings of a museum instrument. Reduced-motion preferences are respected, and rendering stops when the scene is idle or hidden.
+
+**3D is off on every new page or refresh.** The default home and observation pages use images rendered from the current model, without downloading GLB, Three.js or creating WebGL. The switch applies only to those two pages and keeps its selection within the current page. While 3D prepares, the 2D bell remains available. A 30-second preparation timeout, unsupported WebGL or context loss returns to 2D with a retry action. Model bytes can finish downloading in the background while playing; leaving a model page releases its GPU scene. Switching display mode preserves volume, audition progress and fading sound. Each image loads independently, trying PNG if WebP fails, with a playable local outline if both fail.
 
 Saved pieces, volume and language preferences stay in browser storage. There is no application backend, microphone capture, account system or analytics integration. Existing R14/R15 recordings use the same storage identity. Clearing site data or using a different browser/device can remove or separate saved work. Initial page and asset loading requires a network connection; no offline cache installation is provided.
 
@@ -71,9 +75,21 @@ node tests/home-arrival.mjs
 node tests/mobile-viewport.mjs
 node tests/practice.mjs
 node tests/workspace.mjs
+node tests/paired-pitches.mjs
+node tests/resource-loading.mjs
 node scripts/build-pages.mjs
 node tests/pages.mjs
 ```
+
+Browser regression checks use development-only Playwright; no npm package is shipped in the app:
+
+```sh
+npm ci
+npx playwright install --with-deps chromium firefox webkit
+npm run test:browser
+```
+
+On Windows, the suite also checks installed Chrome and Edge. Reports state unavailable browser/audio capabilities explicitly. Emulated phone sizes and the WebKit test build do not replace physical iPhone Safari, Android Chrome or the originally affected remote Edge computer.
 
 The build writes only the generated `_site/` directory. Pull requests run validation; pushes merged into `main` publish that artifact through GitHub Actions to GitHub Pages. Repository-local design studies, Blender sources, original WAV files and validation output are excluded.
 

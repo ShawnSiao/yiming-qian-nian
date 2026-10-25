@@ -5,7 +5,8 @@ import vm from 'node:vm';
 
 const read=path=>readFile(new URL(`../${path}`,import.meta.url));
 const deployment=JSON.parse(await read('_site/deployment.json'));
-assert.equal(deployment.current,'r27.0.0');assert.equal(deployment.entry,'app/');
+assert.equal(deployment.current,JSON.parse(await read('app/version.json')).version);assert.equal(deployment.entry,'app/');
+for(const name of ['home-bell-poster','home-bell-section','bell-small-v2','bell-medium-v2','bell-large-v2','bell-mallet-v10'])for(const extension of ['webp','png'])await read(`_site/app/assets/images/${name}.${extension}`);
 for(const path of ['app','versions/r14','versions/r15']){
   const manifest=JSON.parse(await read(`_site/${path}/deployment.json`));
   assert.equal(manifest.commit,deployment.commit);
