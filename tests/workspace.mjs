@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {scoreMeasures,scoreLocation,pitchNotation,workspaceSplit,clampSplitFraction} from '../app/score-workspace.mjs';
-import {STRIKE_FEEDBACK_MS,malletFeedback} from '../app/strike-feedback.mjs';
+import {STRIKE_FEEDBACK_MS,malletFeedback,homeMalletFeedback} from '../app/strike-feedback.mjs';
 import {performanceLayout,performanceLayoutChanged} from '../app/performance-layout.mjs';
 import {validateTargets} from '../app/model.mjs';
 let checks=0;const check=(v,label)=>{assert.ok(v,label);checks++;};
@@ -30,10 +30,16 @@ for(const width of [1240,1400,1496,1880,2008,2520])for(const fraction of [.56,.6
   const split=workspaceSplit(width,fraction);
   check(Math.abs(split.stage+split.panel+16-width)<.001&&split.stage>=900&&split.panel>=300&&split.panel<=760,'wide splitter reserves a safe minimum instrument and reading width');
   const layout=performanceLayout(split.stage,640),targets=layout.bells.flatMap(b=>b.targets),bodies=layout.bells.map(b=>({id:b.data.id,x:b.x,y:b.y+b.height*.26,width:b.width,height:b.height*.7}));
-  check(layout.bells.length===21&&!validateTargets(targets,bodies,split.stage,640,layout).length,'21 bells and all 44px strike entrances survive each desktop split');
+  check(layout.bells.length===12&&!validateTargets(targets,bodies,split.stage,640,layout).length,'12 bells and all 44px strike entrances survive each desktop split');
   check(!performanceLayoutChanged(performanceLayout(split.stage+20,640),layout),'small splitter movement does not silently change the note bank');
 }
 check(clampSplitFraction(-1)===.56&&clampSplitFraction(2)===.86,'invalid drag fractions remain bounded');
+for(const width of [320,390,599,600,900]){
+  const initial=homeMalletFeedback(0,width),held=homeMalletFeedback(70,width),ended=homeMalletFeedback(480,width);
+  check(initial.height===(width<600?190:280)&&initial.width/initial.height===143/640,'both home modes use the accepted copper artwork proportions and size');
+  check(initial.alpha===1&&held.alpha===1&&held.offsetX===0&&held.offsetY===0,'both home mallets contact immediately and hold for 70 ms');
+  check(ended.alpha===0&&ended.offsetX===16&&ended.offsetY===18,'both home mallets finish the same finite recoil');
+}
 for(const mobile of [true,false])for(const height of [48,90,180,300]){
   const initial=malletFeedback({height},0,mobile),previous=Math.min(112,Math.max(70,height*.76));
   check(initial.height>previous*1.25&&initial.headWidth>=31,'mallet is visibly larger even for a small phone bell');

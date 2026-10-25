@@ -8,17 +8,8 @@ import {BELL_PARTS,bellPart,classifyBellPart} from './data/bell-structure.mjs';
 import {sectionCapGeometry} from './section-cap.mjs';
 import {ARRIVAL,arrivalFrame} from './home-arrival.mjs';
 import {HomeLanding} from './home-landing.mjs';
-
-function copperMallet(){
-  const group=new THREE.Group(),bronze=new THREE.MeshStandardMaterial({color:'#c5a45d',metalness:.86,roughness:.32}),patina=new THREE.MeshStandardMaterial({color:'#4d6255',metalness:.76,roughness:.5});
-  const add=(geometry,material,x,y,z,rotation=0)=>{const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.rotation.z=rotation;group.add(mesh);};
-  add(new THREE.CylinderGeometry(.032,.032,.15,32,1),bronze,0,0,0,Math.PI/2);
-  for(const x of [-.075,.075])add(new THREE.CylinderGeometry(.034,.034,.009,32,1),bronze,x,0,0,Math.PI/2);
-  add(new THREE.CylinderGeometry(.008,.010,.34,20),bronze,0,-.18,.025);
-  add(new THREE.CylinderGeometry(.012,.012,.11,20),patina,0,-.30,.025);
-  for(const y of [-.245,-.27,-.295,-.32,-.345]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.012,.002,6,20),bronze);ring.rotation.x=Math.PI/2;ring.position.set(0,y,.025);group.add(ring);}
-  group.visible=false;return group;
-}
+import {loadBellImage} from './image-resource.mjs';
+import {homeMalletFeedback,drawHomeMallet} from './strike-feedback.mjs';
 
 // One GLB bell. Homepage arrival is finite; inspection has no entrance motion.
 // No rack, shadow-map pass, postprocessing or idle damping loop is loaded here.
@@ -112,7 +103,20 @@ export class HomeBellScene {
       this.mesh=new THREE.Mesh(asset.geometry,this.material);this.mesh.scale.setScalar(2/size.y);this.scene.add(this.mesh);
       this.modelSize=size.multiplyScalar(2/size.y);
       if(this.purpose==='audition'){
-        this.mallets=Array.from({length:3},()=>copperMallet());this.mallets.forEach(mallet=>this.scene.add(mallet));
+        const fallback=document.createElement('canvas');fallback.width=143;fallback.height=640;
+        const ctx=fallback.getContext('2d');ctx.translate(143/2,640*.14);drawHomeMallet(ctx,null,640);
+        this.malletTexture=new THREE.CanvasTexture(fallback);this.malletTexture.colorSpace=THREE.SRGBColorSpace;
+        this.mallets=Array.from({length:3},()=>{
+          const material=new THREE.SpriteMaterial({map:this.malletTexture,transparent:true,toneMapped:false,depthTest:false,depthWrite:false,sizeAttenuation:false});
+          const mallet=new THREE.Sprite(material);mallet.center.set(.5,.86);mallet.visible=false;mallet.renderOrder=10;this.scene.add(mallet);return mallet;
+        });
+        this.host.dataset.malletSource='local-outline';
+        loadBellImage('mallet').then(({image,url})=>{
+          if(this.disposed)return;
+          const texture=new THREE.Texture(image);texture.colorSpace=THREE.SRGBColorSpace;texture.needsUpdate=true;
+          this.mallets.forEach(mallet=>{mallet.material.map=texture;mallet.material.needsUpdate=true;});
+          this.malletTexture.dispose();this.malletTexture=texture;this.host.dataset.malletSource=url.split('/').pop();this.invalidate();
+        }).catch(()=>{});
         this.landing=new HomeLanding(this.scene,-1);this.arriving=intro&&!this.reduced;this.arrivalStart=null;
         if(intro)this.audio?.prepareArrival();
         this.mesh.position.y=arrivalFrame(0,this.reduced||!intro).offset;
@@ -229,6 +233,7 @@ export class HomeBellScene {
   }
   strike(region,point,normal){
     if(this.disposed||document.hidden)return;
+    this.finishArrival();
     const midi=region==='center'?60:64;this.host.dataset.lastMidi=String(midi);this.host.dataset.lastRegion=region;
     this.audio.strike(midi).then(started=>{if(!this.disposed&&started){this.host.dataset.audioNotesStarted=String(this.audio.count);}}).catch(()=>{});
     this.onStrike({midi,region});
@@ -244,7 +249,7 @@ export class HomeBellScene {
       }
       this.ring.position.copy(contact).addScaledVector(direction,.007);
       this.ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction);this.feedback=performance.now();
-      this.impacts.push({point:contact.clone(),normal:direction.clone().normalize(),at:this.feedback});this.impacts=this.impacts.slice(-3);
+      this.impacts.push({point:contact.clone(),region,at:this.feedback});this.impacts=this.impacts.slice(-3);
       clearTimeout(this.feedbackTimer);this.feedbackTimer=setTimeout(()=>{this.feedback=null;this.invalidate();},650);this.invalidate();
     }
   }
@@ -302,16 +307,20 @@ export class HomeBellScene {
     this.ring.visible=progress<1;this.ring.scale.setScalar(this.reduced?1:1+progress*3);this.ring.material.opacity=this.reduced?.65:.7*(1-progress);
     this.material.emissive.set('#c5a45d');this.material.emissiveIntensity=progress<1?.025*(1-progress):0;
     this.impacts=this.impacts.filter(impact=>time-impact.at<650);
+    this.camera.updateMatrixWorld(true);this.malletFrames=[];
     this.mallets.forEach((mallet,index)=>{
       const impact=this.impacts[index];mallet.visible=!!impact&&!this.reduced;
       if(!mallet.visible)return;
-      const recoil=Math.max(0,Math.min(1,(time-impact.at-70)/410));
-      mallet.visible=recoil<1;
-      mallet.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),impact.normal);
-      const bounds=this.focusHost.getBoundingClientRect(),pixels=bounds.width<600?34:48;
-      const scale=pixels*2*Math.tan(this.camera.fov*Math.PI/360)*this.camera.position.distanceTo(impact.point)/(Math.max(1,bounds.height)*.15);
-      const fittedScale=THREE.MathUtils.clamp(scale,.6,1.5);mallet.scale.setScalar(fittedScale);
-      mallet.position.copy(impact.point).addScaledVector(impact.normal,.034*fittedScale+.003+recoil*.22);
+      const feedback=homeMalletFeedback(time-impact.at,this.focusHost.getBoundingClientRect().width);
+      mallet.visible=feedback.alpha>0;mallet.material.opacity=feedback.alpha;
+      // Project the real contact, then apply the same pixel recoil as 2D.
+      // A camera-facing sprite keeps the engraved copper art legible at any yaw.
+      const point=impact.point.clone().project(this.camera),side=impact.region==='left'?-1:1;
+      point.x+=side*feedback.offsetX*2/this.width;point.y-=feedback.offsetY*2/this.height;
+      mallet.position.copy(point.clone().unproject(this.camera));
+      mallet.scale.set(feedback.width*2/(this.width*this.camera.projectionMatrix.elements[0]),feedback.height*2/(this.height*this.camera.projectionMatrix.elements[5]),1);
+      this.host.dataset.malletHeight=String(feedback.height);
+      if(mallet.visible)this.malletFrames.push({region:impact.region,x:(point.x+1)*this.width/2,y:(1-point.y)*this.height/2,width:feedback.width,height:feedback.height,alpha:feedback.alpha});
     });
     this.scene.updateMatrixWorld(true);this.camera.updateMatrixWorld(true);
     const direction=this.camera.position.clone().sub(this.controls.target).normalize(),front=!this.arriving&&direction.z>.12&&this.host.dataset.study!=='cavity';
@@ -334,6 +343,7 @@ export class HomeBellScene {
     this.host.dataset.triangles=String(this.renderer.info.render.triangles);this.host.dataset.modelCount='1';
     this.host.dataset.drawCalls=String(this.renderer.info.render.calls);
     this.host.dataset.malletCount=String(this.mallets.filter(mallet=>mallet.visible).length);
+    this.host.dataset.malletFrames=JSON.stringify(this.malletFrames||[]);
     this.stageHost.dataset.enlarged=String(this.camera.position.distanceTo(this.controls.target)<this.distance*.9);
     this.host.dataset.camera=JSON.stringify({position:this.camera.position.toArray(),target:this.controls.target.toArray(),distance:this.camera.position.distanceTo(this.controls.target)});
     this.host.dataset.contacts=JSON.stringify(['center','left','right'].map(region=>({region,midi:region==='center'?60:64,...this.projected(ANCHORS[region==='center'?'strikeCenter':region==='left'?'strikeLeft':'strikeRight'])})));
@@ -350,7 +360,7 @@ export class HomeBellScene {
     if(this.handlers){this.canvas?.removeEventListener('webglcontextlost',this.handlers.webglcontextlost);this.canvas?.removeEventListener('webglcontextrestored',this.handlers.webglcontextrestored);}
     document.removeEventListener('visibilitychange',this.onHidden);window.removeEventListener('blur',this.onBlur);
     this.material?.dispose();this.asset?.dispose();this.environment?.dispose();this.ring?.geometry.dispose();this.ring?.material.dispose();
-    const geometries=new Set(),materials=new Set();for(const mallet of this.mallets)mallet.traverse(object=>{if(object.isMesh){geometries.add(object.geometry);materials.add(object.material);}});geometries.forEach(geometry=>geometry.dispose());materials.forEach(material=>material.dispose());
+    this.mallets.forEach(mallet=>mallet.material.dispose());this.malletTexture?.dispose();
     this.sectionCap?.geometry.dispose();this.sectionCap?.material.dispose();
     this.landing?.dispose();
     this.renderer?.dispose();this.renderer?.forceContextLoss();this.canvas?.remove();this.labels?.forEach(label=>label.element.remove());this.partMarker?.remove();

@@ -31,14 +31,14 @@ for(const locale of ['en','zh','en']){
   assert.equal(t('第2乐句'),locale==='en'?'Phrase 2':'第2乐句');
   for(const low of [3,4,5])for(const [w,h,mobile,portrait] of [[296,338,true,true],[366,566,true,true],[820,273,true,false],[1396,1000,false,false]]){
     const layout=performanceLayout(w,h,{mobile,portrait,startOctave:low,noteStyle:'classic'});
-    assert.equal(layout.bells.length,layout.rows*7);
+    assert.equal(layout.bells.length,layout.rows*4);
     for(const bell of layout.bells)for(const tag of bellNoteTags(layout,bell)){
       assert.equal(tag.text,pitchLabel(bell.data[tag.region==='center'?'centerMidi':'sideMidi']));
       assert.ok(tag.fontSize>=12);
       if(locale==='en')assert.match(tag.text,/^[A-G]♯?\d$/);
     }
   }
-  for(let col=0;col<7;col++){
+  for(let col=0;col<4;col++){
     const bell=pairedBellAt(4,col);
     assert.equal(bell.centerMidi,60+BELL_PAIRS[col].center);
     assert.equal(bell.sideMidi,60+BELL_PAIRS[col].side);

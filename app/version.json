@@ -1,10 +1,10 @@
 {
-  "version": "r28.0.0",
-  "name": "Lightweight home and opt-in 3D",
+  "version": "r29.0.0",
+  "name": "Four bells per register",
   "languages": [
     "en",
     "zh-CN"
   ],
-  "source": "Approved lightweight home, paired pitches and R26 model",
+  "source": "Approved R29 four-bell prototype, lightweight home and R26 model",
   "model": "single-bell.glb"
 }

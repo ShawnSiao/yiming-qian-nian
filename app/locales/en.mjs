@@ -332,5 +332,17 @@ export default {
   "编钟静态结构图，选择部位查看说明":"Static bell study. Select a part to read about it.",
   "可敲击的编钟，中央正鼓与左右侧鼓":"Playable bell: strike the center or either side.",
   "轻点钟面试听。":"Tap the bell to hear a tone.",
-  "钟乳与带状纹饰沿钟身排列。":"Raised bosses and decorative bands follow the bell's surface."
+  "钟乳与带状纹饰沿钟身排列。":"Raised bosses and decorative bands follow the bell's surface.",
+  "聚焦一排":"One register",
+  "展开音组":"Expand registers",
+  "{0} 口 · 每音组四口":"{0} bells · Four per register",
+  "一组四口 · 中央与两角可敲":"Four per register · Tap the center or either corner",
+  "每排四口：c/e、d/f、g/b、a/高八度 c。两角为同一侧鼓音；可聚焦一排并切换音组。":"Four bells per register: C/E, D/F, G/B, A/next C. Both corners share one side tone. Focus on one register or change range.",
+  "钟悬在铜木结构的架上；一组四口是本页的现代演奏编排。":"The bells hang from a bronze-and-wood rack. Four bells per register is this app's modern playing layout.",
+  "背景钟架展示悬挂场景；本页的四钟音组是现代演奏编排。":"The background rack illustrates suspension. Four bells per register is this app's modern playing layout.",
+  "待补音":"Missing pitches",
+  "待补音：{0}":"Missing pitches: {0}",
+  "待补音：{0}。四钟音组暂不支持整曲试听与跟奏。":"Missing pitches: {0}. Full previews and practice are unavailable for this score in the four-bell layout.",
+  "当前曲谱含未设置击点的音，请换曲。":"This score needs pitches not available on this rack. Choose another piece.",
+  "旧录曲按原音高回放，当前钟架未设置的音只发声，不显示击点。":"Saved recordings keep their original pitches. Notes missing from this rack still sound, without a strike highlight."
 };

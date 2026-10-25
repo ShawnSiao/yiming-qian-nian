@@ -50,16 +50,17 @@ async function core(browser,engine){
     await homeHit(page,'left');await homeHit(page,'right');await homeHit(page);await page.waitForFunction(()=>Number(document.querySelector('.home-2d-host')?.dataset.malletCount)>0);
     await shot(page,engine+'-home-2d-mallet');await page.waitForTimeout(1000);
     const count=await page.locator('.home-2d-host').getAttribute('data-frames');await page.waitForTimeout(180);assert.equal(await page.locator('.home-2d-host').getAttribute('data-frames'),count,'No idle painting');
-    await nav(page,0);await page.locator('.main-performance-surface').waitFor();
+    await nav(page,0);await page.locator('.main-performance-surface').waitFor();await page.locator('.bank-picker select:visible').first().selectOption('3');
     for(const [octave,center,side] of [[3,48,52],[4,60,64],[5,72,76]]){
       await hit(page,`bell-${octave}-c`,'center',center);await hit(page,`bell-${octave}-c`,'left',side);await hit(page,`bell-${octave}-c`,'right',side);
     }
-    await hit(page,'bell-4-e','center',64);await hit(page,'bell-4-e','left',67);await hit(page,'bell-4-e','right',67);
-    await hit(page,'bell-4-f','center',65);await hit(page,'bell-4-f','right',66);await hit(page,'bell-4-b','center',71);await hit(page,'bell-4-b','right',74);
+    for(const [letter,center,side] of [['c',60,64],['d',62,65],['g',67,71],['a',69,72]]){
+      await hit(page,`bell-4-${letter}`,'center',center);await hit(page,`bell-4-${letter}`,'left',side);await hit(page,`bell-4-${letter}`,'right',side);
+    }
     const keys=JSON.parse(await page.locator('.main-performance-surface').getAttribute('data-layout')).octaves;
-    const row=keys.indexOf(4),keyboard=['1234567','qwertyu','asdfghj'][row];assert.ok(keyboard);
-    for(const [column,midi] of [[2,67],[3,66],[6,74]]){await page.keyboard.press('Shift+'+keyboard[column]);await page.waitForFunction(note=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(note),midi);}
-    await page.locator('.bank-picker select').first().selectOption('4');await hit(page,'bell-6-b','right',98);await shot(page,engine+'-play-d7');
+    const row=keys.indexOf(4),keyboard=['1234','qwer','asdf'][row];assert.ok(keyboard);
+    for(const [column,midi] of [[0,64],[1,65],[2,71],[3,72]]){await page.keyboard.press('Shift+'+keyboard[column]);await page.waitForFunction(note=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(note),midi);}
+    await page.locator('.bank-picker select:visible').first().selectOption('4');await hit(page,'bell-6-a','right',96);await shot(page,engine+'-play-c7');
     const frequency=await page.evaluate(async()=>{
       const {BellAudio}=await import('./audio.mjs'),answers=[];
       const Offline=window.OfflineAudioContext||window.webkitOfflineAudioContext;
@@ -90,7 +91,7 @@ async function core(browser,engine){
       await page.evaluate(()=>{window.__qaMalletFrames=[];const host=document.querySelector('.home-canvas-host');new MutationObserver(()=>{if(Number(host.dataset.malletCount)>0)window.__qaMalletFrames.push(host.dataset.frames);}).observe(host,{attributes:true,attributeFilter:['data-frames']});});
       await page.locator('.audition-steps button').first().click();await page.waitForFunction(()=>window.__qaMalletFrames.length>0);await shot(page,engine+'-home-3d-mallet');
       await page.getByRole('button',{name:'重听落钟声'}).click();await page.locator('.home-canvas-host[data-arrival="descending"]').waitFor();assert.equal(await page.locator('.home-canvas-host').getAttribute('data-mallet-count'),'0');
-      await page.locator('.audition-steps button').last().click();await page.locator('.home-canvas-host[data-arrival="settled"]').waitFor();
+      await page.locator('.audition-steps button').last().click();await page.locator('.home-canvas-host[data-arrival="settled"]').waitFor({timeout:1000});
       await nav(page,2);await page.locator('.home-object[data-model-state="ready"]').waitFor();await page.getByRole('button',{name:'剖视',exact:true}).click();await page.locator('.home-canvas-host[data-section-loops]').waitFor();
       await shot(page,engine+'-section-3d');
     }
@@ -112,9 +113,9 @@ async function core(browser,engine){
     const switchBounds=await page.locator('.model-switch').boundingBox();assert.ok(switchBounds.height>=44);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await shot(page,engine+'-phone-home');
     await page.locator('.home-actions .primary').click();const surface=page.locator('.main-performance-surface');await surface.waitFor();
-    let layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([7,14,21].includes(layout.rows*7));
+    let layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([4,8,12].includes(layout.rows*4));assert.equal(layout.columns,4);
     await shot(page,engine+'-phone-portrait');await page.setViewportSize({width:844,height:390});
-    await page.waitForTimeout(150);layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([7,14,21].includes(layout.rows*7));
+    await page.waitForTimeout(150);layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([4,8,12].includes(layout.rows*4));assert.equal(layout.columns,4);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await shot(page,engine+'-phone-landscape');assert.equal(requests.filter(heavy).length,0);
   });
   await test(browser,engine,'header-model-switch',async(page,context,requests)=>{
@@ -132,8 +133,8 @@ async function core(browser,engine){
     const work={id:'legacy-check',title:'Compatibility take',durationMs:1600,events:[{midi:64,time:0,region:'left',bellId:'bell-4-e'},{midi:71,time:650,region:'right',bellId:'bell-4-b'}]};
     await context.addInitScript(value=>localStorage.setItem('ymqn:3d:v1:works',JSON.stringify([value])),work);await open(page,'works');
     await page.getByRole('button',{name:/播放.*Compatibility take/}).click();
-    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.lastMidi==='64');assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-region'),'center');
-    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.lastMidi==='71');assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-region'),'center');
+    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.lastMidi==='64');assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-region'),'left');
+    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.lastMidi==='71');assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-region'),'right');
     assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ymqn:3d:v1:works'))),[work]);
   });
   await test(browser,engine,'practice-and-recording',async(page,context,requests)=>{
@@ -147,6 +148,106 @@ async function core(browser,engine){
     await nav(page,3);await page.getByRole('button',{name:'修改New paired recording的曲名',exact:true}).click();await page.getByLabel('曲名',{exact:true}).fill('Renamed paired recording');await page.getByRole('button',{name:'保存曲名',exact:true}).click();
     const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('ymqn:3d:v1:works')));assert.equal(saved[0].title,'Renamed paired recording');assert.deepEqual(saved[0].events.map(event=>event.midi),[60,67,74]);assert.equal(requests.filter(heavy).length,0);
   });
+  await test(browser,engine,'four-bell-focus-and-availability',async(page,context,requests)=>{
+    const dimensions=[[1440,900],[390,844],[360,740],[320,568],[844,390],[932,430]];
+    for(const [width,height] of dimensions){
+      await page.setViewportSize({width,height});await open(page,'play');
+      const surface=page.locator('.main-performance-surface');await surface.locator('.strike-target').first().waitFor({state:'attached'});
+      await page.locator('.bank-picker select:visible').first().selectOption('4');
+      await page.waitForFunction(()=>JSON.parse(document.querySelector('.main-performance-surface').dataset.layout).low===4);
+      let layout=JSON.parse(await surface.getAttribute('data-layout'));
+      assert.equal(layout.columns,4);assert.equal(layout.displayRows,layout.rows);assert.deepEqual(layout.issues,[]);
+      assert.equal(await surface.locator('.strike-target').count(),layout.rows*8);
+      const targets=JSON.parse(await surface.getAttribute('data-targets'));assert.ok(targets.every(t=>t.width>=44&&t.height>=44));
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      for(const button of await page.locator('.app-header button:visible,.play-layout-controls button:visible').all()){
+        const box=await button.boundingBox();assert.ok(box.x>=-.5&&box.x+box.width<=width+.5,`Visible toolbar control stays on screen at ${width}x${height}`);
+      }
+      await hit(page,'bell-4-c','left',64);
+      await page.locator('.focus-register:visible').first().click();
+      await page.waitForFunction(()=>JSON.parse(document.querySelector('.main-performance-surface').dataset.layout).rows===1);
+      await page.locator('.bank-picker select:visible').first().selectOption('6');await hit(page,'bell-6-a','right',96);
+      await page.locator('.mute-control').click();const notes=Number(await surface.getAttribute('data-audio-notes-started'));
+      await page.locator('.focus-register:visible').first().click();
+      layout=JSON.parse(await surface.getAttribute('data-layout'));
+      await hit(page,`bell-${layout.low}-c`,'right',(layout.low+1)*12+4);
+      assert.equal(Number(await surface.getAttribute('data-audio-notes-started')),notes,'Layout changes preserve mute');
+      await page.locator('.mute-control').click();
+      await page.waitForTimeout(160);await shot(page,`${engine}-four-${width}x${height}`);
+    }
+    await nav(page,1);const missing=page.locator('.song-list .song-row[data-playable="false"]');assert.equal(await missing.count(),1);
+    assert.match(await missing.locator('.song-info strong').textContent(),/晴天/);
+    assert.ok(await missing.locator('.song-preview').isDisabled());assert.ok(await missing.locator('.song-practice').isDisabled());
+    await missing.locator('.song-info').click();assert.ok(await page.locator('.library-score-actions .primary').isDisabled());
+    await shot(page,`${engine}-four-missing-pitches-zh`);
+    await page.getByRole('button',{name:'切换为英文',exact:true}).click();
+    assert.match(await missing.locator('.pitch-availability').textContent(),/Missing pitches: F♯4/);
+    assert.ok(await page.locator('.library-score-actions .primary').isDisabled());
+    assert.equal(await page.locator('.song-list [data-song-id^="zhuzhi-ci"]').count(),2);
+    assert.equal(requests.filter(heavy).length,0);return {dimensions,fourBellsPerRow:true,missingPitchScore:'Qing Tian'};
+  });
+  await test(browser,engine,'legacy-audio-only-pitches',async(page,context)=>{
+    const work={id:'old-chromatic',title:'Old pitch take',durationMs:1550,events:[{midi:64,time:0,region:'left',bellId:'bell-4-e'},{midi:66,time:220,region:'right',bellId:'bell-4-f'},{midi:71,time:440,region:'right',bellId:'bell-4-b'},{midi:98,time:660,region:'right',bellId:'bell-6-b'}]};
+    await context.addInitScript(value=>{
+      localStorage.setItem('ymqn:3d:v1:works',JSON.stringify([value]));window.__legacyFrequencies=[];
+      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
+      const create=Audio.prototype.createOscillator;
+      Audio.prototype.createOscillator=function(){const oscillator=create.call(this),start=oscillator.start.bind(oscillator);oscillator.start=(...args)=>{window.__legacyFrequencies.push(oscillator.frequency.value);return start(...args);};return oscillator;};
+    },work);
+    await open(page,'works');await page.getByRole('button',{name:/播放.*Old pitch take/}).click();await page.locator('.bell-app[data-phase="work"]').waitFor();
+    await page.locator('.bell-app[data-phase="free"]').waitFor();
+    const frequencies=await page.evaluate(()=>window.__legacyFrequencies);
+    if(frequencies.length){assert.equal(frequencies.length,12);work.events.forEach((event,index)=>assert.ok(Math.abs(frequencies[index*3]-440*2**((event.midi-69)/12))<.1,'Legacy F-sharp and D7 keep their absolute frequency'));}
+    else assert.equal(await page.evaluate(()=>!!(window.AudioContext||window.webkitAudioContext)),false);
+    assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ymqn:3d:v1:works'))),[work]);
+    assert.equal(await page.locator('.main-performance-surface').getAttribute('data-last-midi'),'71','Unavailable D7 does not highlight a different bell');
+    return {events:work.events.map(e=>e.midi),audioVerified:frequencies.length>0};
+  });
+  await test(browser,engine,'home-mallet-parity',async(page,context)=>{
+    await open(page);await settled(page);const flat=page.locator('.home-2d-host'),model=page.locator('.home-canvas-host');
+    await flat.locator(':scope').waitFor();await page.locator('.home-2d-host[data-mallet-source]').waitFor();
+    const source=await flat.getAttribute('data-mallet-source');assert.match(source,/bell-mallet-v10\.(webp|png)$/);
+    await homeHit(page);await page.waitForFunction(()=>Number(document.querySelector('.home-2d-host').dataset.malletCount)>0);
+    const desktopHeight=Number(await flat.getAttribute('data-mallet-height'));await shot(page,engine+'-matched-mallet-2d');
+    await modelSwitch(page).check();await page.locator('.home-object[data-model-state="ready"],.home-object[data-model-state="unsupported"]').waitFor({timeout:35000});
+    if(await page.locator('.home-object').getAttribute('data-model-state')==='unsupported')return {threeD:'unsupported'};
+    await page.waitForFunction(expected=>document.querySelector('.home-canvas-host').dataset.malletSource===expected,source);
+    await page.evaluate(async()=>{
+      const THREE=await import('./vendor/three.module.min.js');window.__homeMalletSamples=[];
+      const before=THREE.Sprite.prototype.onBeforeRender;
+      THREE.Sprite.prototype.onBeforeRender=function(...args){before?.apply(this,args);if(this.renderOrder===10){window.__homeMalletSamples.push({source:this.material.map.image.src,toneMapped:this.material.toneMapped,center:this.center.toArray(),opacity:this.material.opacity});window.__homeMalletSamples=window.__homeMalletSamples.slice(-64);}};
+      const after=THREE.Sprite.prototype.onAfterRender;
+      THREE.Sprite.prototype.onAfterRender=function(...args){after?.apply(this,args);if(this.renderOrder===10&&!window.__homeMalletProof)window.__homeMalletProof=args[0].domElement.toDataURL('image/png');};
+    });
+    for(const [index,region] of [[0,'center'],[1,'left']]){
+      await page.locator('.audition-steps button').nth(index).click();
+      const sample=await page.waitForFunction(region=>{const host=document.querySelector('.home-canvas-host'),frame=JSON.parse(host.dataset.malletFrames).findLast(frame=>frame.region===region);return frame?{frame,contact:JSON.parse(host.dataset.contacts).find(p=>p.region===region)}:false;},region);
+      const {frame,contact}=await sample.jsonValue(),side=region==='left'?-1:1;
+      assert.equal(frame.height,desktopHeight);
+      assert.ok(Math.abs(frame.x-side*(1-frame.alpha)*16-contact.x)<1&&Math.abs(frame.y-(1-frame.alpha)*18-contact.y)<1,'Mallet head follows the actual projected strike and the same 2D recoil');
+      assert.equal(frame.width/frame.height,143/640);await shot(page,engine+'-matched-mallet-3d-'+region);
+    }
+    const proof=await page.evaluate(()=>window.__homeMalletProof);assert.ok(proof);await writeFile(resolve(output,engine+'-matched-mallet-3d-layer.png'),Buffer.from(proof.split(',')[1],'base64'));
+    const material=await page.evaluate(()=>window.__homeMalletSamples.at(-1));assert.ok(material);assert.match(material.source,/bell-mallet-v10\.(webp|png)$/);assert.equal(material.toneMapped,false);assert.deepEqual(material.center,[.5,.86]);
+    await page.locator('.home-object').focus();await page.keyboard.press('ArrowRight');await page.keyboard.press('+');
+    await page.locator('.audition-steps button').first().click();await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);assert.equal(Number(await model.getAttribute('data-mallet-height')),desktopHeight);
+    for(let n=0;n<8;n++)await page.locator('.audition-steps button').nth(n%2).click();assert.ok(Number(await model.getAttribute('data-mallet-count'))<=3);
+    await page.waitForFunction(()=>{const host=document.querySelector('.home-canvas-host'),frames=host.dataset.frames,previous=window.__malletIdleProbe;if(!previous||previous.frames!==frames){window.__malletIdleProbe={frames,at:performance.now()};return false;}return host.dataset.malletCount==='0'&&performance.now()-previous.at>240;},null,{timeout:4000});
+    const frames=await model.getAttribute('data-frames');await page.waitForTimeout(150);assert.equal(await model.getAttribute('data-frames'),frames,'3D feedback stops rendering when quiet');
+    await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);
+    const contacts=JSON.parse(await model.getAttribute('data-contacts')),p=contacts.find(point=>point.region==='center'),bounds=await model.locator('canvas').boundingBox();
+    await page.mouse.click(bounds.x+p.x,bounds.y+p.y);await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);
+    assert.equal(Number(await model.getAttribute('data-mallet-height')),190);await shot(page,engine+'-matched-mallet-mobile-3d');
+    await modelSwitch(page).uncheck();await page.locator('.home-object[data-model-state="off"]').waitFor();await homeHit(page);
+    await page.waitForFunction(()=>Number(document.querySelector('.home-2d-host').dataset.malletCount)>0);assert.equal(Number(await flat.getAttribute('data-mallet-height')),190);
+    assert.ok(await page.evaluate(()=>window.__qaGL.every(context=>context.isContextLost())));
+    await page.route(/\/bell-mallet-v10\.(?:webp|png)$/,route=>route.fulfill({status:404,body:''}));await page.reload();await settled(page);
+    await modelSwitch(page).check();await page.locator('.home-object[data-model-state="ready"]').waitFor({timeout:35000});
+    assert.equal(await model.getAttribute('data-mallet-source'),'local-outline');
+    const fallback=JSON.parse(await model.getAttribute('data-contacts')).find(point=>point.region==='center'),fallbackBounds=await model.locator('canvas').boundingBox();await page.mouse.click(fallbackBounds.x+fallback.x,fallbackBounds.y+fallback.y);
+    await page.waitForFunction(()=>Number(document.querySelector('.home-canvas-host').dataset.malletCount)>0);
+    return {source,desktopHeight,mobileHeight:190,sharedArtwork:true,fallbackVisible:true};
+  });
 }
 async function faults(browser){
   const engine='chromium';
@@ -154,24 +255,24 @@ async function faults(browser){
     await page.route(/\/(?:bell-|home-bell-).*\.webp$/,route=>route.fulfill({status:200,contentType:'image/webp',body:'invalid WebP'}));
     await open(page);await settled(page);assert.match(await page.locator('.home-2d-host').getAttribute('data-poster-source'),/\.png$/);
     await nav(page,0);await page.locator('.main-performance-surface[data-middle-source]').waitFor();
-    assert.match(await page.locator('.main-performance-surface').getAttribute('data-middle-source'),/\.png$/);await hit(page,'bell-4-e','right',67);
+    assert.match(await page.locator('.main-performance-surface').getAttribute('data-middle-source'),/\.png$/);await hit(page,'bell-4-g','center',67);
   });
   await test(browser,engine,'all-images-fail',async page=>{
     await page.route(/\/(?:bell-|home-bell-).*\.(?:webp|png)$/,route=>route.fulfill({status:404,body:''}));
     await open(page);await page.locator('.home-2d-host[data-asset-errors="2"]').waitFor();await homeHit(page);
-    await nav(page,0);await page.locator('.main-performance-surface[data-asset-errors="4"]').waitFor();await hit(page,'bell-4-f','right',66);
+    await nav(page,0);await page.locator('.main-performance-surface[data-asset-errors="4"]').waitFor();await hit(page,'bell-4-d','right',65);
     assert.ok(await page.locator('.asset-retry').isVisible());const pixels=await page.locator('.main-bells').evaluate(canvas=>{const d=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let count=0;for(let i=3;i<d.length;i+=4)if(d[i])count++;return count;});assert.ok(pixels>10000);await shot(page,'all-images-local-placeholder');
   });
   await test(browser,engine,'model-404',async page=>{
     let failed=false;await page.route('**/single-bell.glb',route=>{if(failed)return route.continue();failed=true;return route.fulfill({status:404,body:''});});await open(page);await settled(page);await modelSwitch(page).check();
     await page.locator('.home-object[data-model-state="error"]').waitFor();await homeHit(page,'right');await page.locator('.model-state button').click();await page.locator('.home-object[data-model-state="ready"]').waitFor();
-    await nav(page,0);await hit(page,'bell-4-e','right',67);
+    await nav(page,0);await hit(page,'bell-4-g','center',67);
   });
   await test(browser,engine,'progressive-images',async page=>{
     let release;const gate=new Promise(resolve=>release=resolve);await page.route('**/bell-small-v2.webp',async route=>{await gate;await route.continue().catch(()=>{});});
     try{
       await open(page,'play');await page.locator('.main-performance-surface[data-middle-source][data-bottom-source]').waitFor();assert.equal(await page.locator('.main-performance-surface').getAttribute('data-top-source'),null);
-      await hit(page,'bell-4-e','right',67);release();await page.locator('.main-performance-surface[data-top-source]').waitFor();
+      await hit(page,'bell-4-g','center',67);release();await page.locator('.main-performance-surface[data-top-source]').waitFor();
     }finally{release();}
   });
   await test(browser,engine,'webgl-unavailable',async(page,context)=>{
@@ -182,7 +283,7 @@ async function faults(browser){
     let release;const gate=new Promise(resolve=>release=resolve);let requested=false;
     await page.route('**/single-bell.glb',async route=>{requested=true;await gate;await route.continue().catch(()=>{});});
     await open(page);await settled(page);await modelSwitch(page).check();await page.waitForFunction(()=>document.querySelector('.home-object')?.dataset.modelState==='loading');
-    await homeHit(page,'left');await nav(page,0);assert.ok(requested);await hit(page,'bell-4-e','right',67);release();
+    await homeHit(page,'left');await nav(page,0);assert.ok(requested);await hit(page,'bell-4-g','center',67);release();
     await page.waitForTimeout(250);assert.equal(await page.locator('.home-canvas-host canvas').count(),0);await nav(page,2);await page.locator('.home-object[data-model-state="ready"]').waitFor({timeout:35000});
   });
   await test(browser,engine,'first-frame-error',async page=>{
@@ -231,12 +332,12 @@ async function faults(browser){
     await page.locator('.home-object').evaluate(element=>{const r=element.getBoundingClientRect(),data={bubbles:true,pointerId:81,pointerType:'touch',button:0,clientX:r.x+r.width*.25,clientY:r.y+r.height*.8};for(const name of ['pointerdown','pointercancel','pointerup'])element.dispatchEvent(new PointerEvent(name,data));});
     assert.equal(await page.locator('.home-2d-host').getAttribute('data-last-region'),before,'Cancelled home touches do not strike');
     for(let n=0;n<8;n++)await page.locator('.audition-steps button').nth(n%2).click();assert.ok(Number(await page.locator('.home-2d-host').getAttribute('data-mallet-count'))<=3);
-    await nav(page,0);await hit(page,'bell-4-e','right',67);
+    await nav(page,0);await hit(page,'bell-4-g','center',67);
     await page.locator('.main-bells').evaluate(canvas=>{const r=canvas.getBoundingClientRect(),data={bubbles:true,pointerId:82,pointerType:'touch',button:0,clientX:r.x+r.width*.5,clientY:r.y+r.height*.7};canvas.dispatchEvent(new PointerEvent('pointerdown',data));canvas.dispatchEvent(new PointerEvent('pointercancel',data));});
     assert.equal(await page.locator('.main-performance-surface').getAttribute('data-active-pointers'),'0');
     await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
     const count=await page.locator('.main-bells').getAttribute('data-frame-count');await page.waitForTimeout(180);assert.equal(await page.locator('.main-bells').getAttribute('data-frame-count'),count);
-    await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});await hit(page,'bell-4-b','right',74);
+    await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});await hit(page,'bell-4-d','center',62);
     return {visibility:'Synthetic visibilitychange; physical background/foreground remains a device check.'};
   });
 }
