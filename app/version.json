@@ -1,10 +1,10 @@
 {
-  "version": "r27.0.0",
-  "name": "Bilingual web release",
+  "version": "r28.0.0",
+  "name": "Lightweight home and opt-in 3D",
   "languages": [
     "en",
     "zh-CN"
   ],
-  "source": "Approved R26 experience",
+  "source": "Approved lightweight home, paired pitches and R26 model",
   "model": "single-bell.glb"
 }

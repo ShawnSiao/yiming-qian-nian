@@ -188,7 +188,7 @@ export default {
   "第一次推荐": "Recommended first phrase",
   "第一次试试": "Try this first",
   "竹枝词 · 第一小节": "Zhuzhi Ci · First phrase",
-  "5 次落槌 · 两音组 · 先慢慢敲对": "5 strikes · Two octaves · Take your time",
+  "5 次落槌 · 先慢慢敲对": "5 strikes · Take your time",
   "开始第一句": "Try this phrase",
   "曲目分类": "Song categories",
   "录音转谱初稿": "Transcription draft",
@@ -320,5 +320,17 @@ export default {
   "录音全长 2:33 · 1=F。全长击音线转谱初稿，非审定双声部总谱。": "A draft transcription of the full 2:33 performance, with F as tonic. It follows prominent strikes; it is not a verified two-part score.",
   "＊ 为待核对击音。小节与音值为量化初稿；未完成专家逐音听校，未可靠分离编钟／编磬。": "＊ marks strikes that need review. Bar lines and note lengths are quantized estimates. A musician has not checked every note, and the bronze-bell and stone-chime parts have not been reliably separated.",
   "晴天": "Qing Tian (Sunny Day)",
-  "流行抒情旋律，用全律音列改写为编钟事件谱，适合练习连贯的句读与呼吸。": "A pop ballad arranged for the available bell pitches, for practicing connected phrases and musical breathing."
+  "流行抒情旋律，用全律音列改写为编钟事件谱，适合练习连贯的句读与呼吸。": "A pop ballad arranged for the available bell pitches, for practicing connected phrases and musical breathing.",
+  "3D 展示":"3D view",
+  "开启 3D 展示":"Turn on 3D view",
+  "关闭 3D 展示":"Turn off 3D view",
+  "准备中…":"Preparing…",
+  "3D 不可用":"3D unavailable",
+  "3D 未就绪":"3D not ready",
+  "重试":"Retry",
+  "重试图片":"Retry images",
+  "编钟静态结构图，选择部位查看说明":"Static bell study. Select a part to read about it.",
+  "可敲击的编钟，中央正鼓与左右侧鼓":"Playable bell: strike the center or either side.",
+  "轻点钟面试听。":"Tap the bell to hear a tone.",
+  "钟乳与带状纹饰沿钟身排列。":"Raised bosses and decorative bands follow the bell's surface."
 };

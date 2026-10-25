@@ -9,11 +9,23 @@ import {sectionCapGeometry} from './section-cap.mjs';
 import {ARRIVAL,arrivalFrame} from './home-arrival.mjs';
 import {HomeLanding} from './home-landing.mjs';
 
+function copperMallet(){
+  const group=new THREE.Group(),bronze=new THREE.MeshStandardMaterial({color:'#c5a45d',metalness:.86,roughness:.32}),patina=new THREE.MeshStandardMaterial({color:'#4d6255',metalness:.76,roughness:.5});
+  const add=(geometry,material,x,y,z,rotation=0)=>{const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.rotation.z=rotation;group.add(mesh);};
+  add(new THREE.CylinderGeometry(.032,.032,.15,32,1),bronze,0,0,0,Math.PI/2);
+  for(const x of [-.075,.075])add(new THREE.CylinderGeometry(.034,.034,.009,32,1),bronze,x,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(.008,.010,.34,20),bronze,0,-.18,.025);
+  add(new THREE.CylinderGeometry(.012,.012,.11,20),patina,0,-.30,.025);
+  for(const y of [-.245,-.27,-.295,-.32,-.345]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.012,.002,6,20),bronze);ring.rotation.x=Math.PI/2;ring.position.set(0,y,.025);group.add(ring);}
+  group.visible=false;return group;
+}
+
 // One GLB bell. Homepage arrival is finite; inspection has no entrance motion.
 // No rack, shadow-map pass, postprocessing or idle damping loop is loaded here.
 export class HomeBellScene {
-  constructor(host,{audio,onStrike=()=>{},onContext=()=>{},purpose='audition',onInspect=()=>{},intro=true,onProject=()=>{},onArrivalAudio=()=>{}}){
-    Object.assign(this,{host,audio,onStrike,onContext,purpose,onInspect,frames:0,raf:0,disposed:false,lost:false});
+  constructor(host,{audio,bytes,onError=()=>{},onStrike=()=>{},onContext=()=>{},purpose='audition',onInspect=()=>{},intro=true,onProject=()=>{},onArrivalAudio=()=>{}}){
+    Object.assign(this,{host,audio,onError,onStrike,onContext,purpose,onInspect,frames:0,raf:0,disposed:false,lost:false,interactive:false,impacts:[],mallets:[]});
+    try{
     this.focusHost=host.closest('.home-object');this.stageHost=host.closest('.home-screen')||this.focusHost;
     this.onProject=onProject;this.onArrivalAudio=onArrivalAudio;this.intro=intro;this.impactHandled=!intro;
     this.gesture=new HomeGesture();this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -21,6 +33,7 @@ export class HomeBellScene {
     this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
     this.renderer.setClearColor(0x000000,0);this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;
+    this.renderer.debug.onShaderError=()=>{this.shaderFailure=new Error('WebGL shader failed');};
     this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;
     this.canvas.setAttribute('aria-label',t('可滑动旋转的单口 3D 编钟；方向键旋转，Shift 加方向键平移，加减键缩放，Home 恢复正面'));
     this.canvas.title=t('拖动旋转，滚轮缩放，右键拖动或 Shift＋方向键平移');
@@ -32,9 +45,11 @@ export class HomeBellScene {
     const light=(color,intensity,x,y,z)=>{const source=new THREE.DirectionalLight(color,intensity);source.position.set(x,y,z);this.scene.add(source);};
     light('#f2e1c0',3.8,-3.8,4,3);light('#b8cec5',1.35,3,1,-2);light('#e5d5b2',.5,3,2,5);
     // Only the actual bell owns gestures; the background remains still.
-    this.input=this.focusHost;this.input.tabIndex=0;this.input.setAttribute('role','img');
-    this.input.setAttribute('aria-label',this.canvas.getAttribute('aria-label'));this.canvas.tabIndex=-1;this.canvas.setAttribute('aria-hidden','true');
+    this.input=this.focusHost;this.canvas.tabIndex=-1;this.canvas.setAttribute('aria-hidden','true');
     this.gate=event=>{
+      // OrbitControls must not capture the pointer used by the 3D switch.
+      if(event.target.closest('button,input,a,select,.model-mode-controls')){event.stopImmediatePropagation();return;}
+      if(!this.interactive)return;
       if(this.gesture.pointers.size)return;
       if(!this.mesh){event.stopImmediatePropagation();return;}
       const r=this.canvas.getBoundingClientRect();
@@ -42,7 +57,7 @@ export class HomeBellScene {
       if(!this.raycaster.intersectObject(this.mesh).length)event.stopImmediatePropagation();
     };
     this.input.addEventListener('pointerdown',this.gate,true);this.input.addEventListener('wheel',this.gate,true);
-    this.controls=new OrbitControls(this.camera,this.input);this.controls.enablePan=true;this.controls.enableDamping=false;
+    this.controls=new OrbitControls(this.camera,this.input);this.controls.enabled=false;this.controls.enablePan=true;this.controls.enableDamping=false;
     this.controls.rotateSpeed=.48;this.controls.minPolarAngle=Math.PI*.08;this.controls.maxPolarAngle=Math.PI*.92;
     this.controls.addEventListener('change',this.onChange=()=>this.invalidate());
     this.raycaster=new THREE.Raycaster();
@@ -53,18 +68,18 @@ export class HomeBellScene {
     this.labels=[];
     if(purpose==='inspect'){
       this.canvas.setAttribute('aria-label',t('可旋转的编钟结构模型；轻点部位查看说明，方向键旋转，Shift 加方向键平移'));
-      this.input.setAttribute('aria-label',this.canvas.getAttribute('aria-label'));
       this.partMarker=document.createElement('span');this.partMarker.className='structure-marker';this.partMarker.setAttribute('aria-hidden','true');this.partMarker.hidden=true;host.append(this.partMarker);
       this.renderer.localClippingEnabled=true;
     }
     this.handlers={
-      pointerdown:event=>{if(document.hidden||this.lost)return;this.finishArrival();if(event.button!==0)return;this.gesture.start(event);this.publish();},
-      wheel:()=>this.finishArrival(),
+      pointerdown:event=>{if(!this.interactive||event.target.closest('button,input,a,select')||document.hidden||this.lost)return;this.finishArrival();if(event.button!==0)return;this.gesture.start(event);this.publish();},
+      wheel:()=>{if(this.interactive)this.finishArrival();},
       pointermove:event=>{this.gesture.move(event);},
       pointerup:event=>{const tap=this.gesture.end(event);this.publish();if(tap)this.tap(tap.x,tap.y);},
       pointercancel:event=>{this.gesture.end(event,true);this.publish();},
       lostpointercapture:event=>{this.gesture.end(event,true);this.publish();},
       keydown:event=>{
+        if(!this.interactive||event.target.closest('button,input,a,select'))return;
         this.finishArrival();
         if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){
           if(event.shiftKey){
@@ -88,7 +103,7 @@ export class HomeBellScene {
     this.onHidden=()=>{if(document.hidden)this.cancel();else this.invalidate();};this.onBlur=()=>this.cancel();
     document.addEventListener('visibilitychange',this.onHidden);window.addEventListener('blur',this.onBlur);
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(this.focusHost);this.observer.observe(this.stageHost);
-    this.ready=loadObservationGeometry().then(asset=>{
+    this.ready=loadObservationGeometry({bytes}).then(asset=>{
       if(this.disposed){asset.dispose();return;}
       this.asset=asset;asset.geometry.computeBoundingBox();this.sourceBounds=asset.geometry.boundingBox.clone();
       this.sourceCenter=this.sourceBounds.getCenter(new THREE.Vector3());const size=this.sourceBounds.getSize(new THREE.Vector3());
@@ -97,14 +112,19 @@ export class HomeBellScene {
       this.mesh=new THREE.Mesh(asset.geometry,this.material);this.mesh.scale.setScalar(2/size.y);this.scene.add(this.mesh);
       this.modelSize=size.multiplyScalar(2/size.y);
       if(this.purpose==='audition'){
+        this.mallets=Array.from({length:3},()=>copperMallet());this.mallets.forEach(mallet=>this.scene.add(mallet));
         this.landing=new HomeLanding(this.scene,-1);this.arriving=intro&&!this.reduced;this.arrivalStart=null;
         if(intro)this.audio?.prepareArrival();
         this.mesh.position.y=arrivalFrame(0,this.reduced||!intro).offset;
       }
       // Remove the loading state only after the first genuine 3D frame exists.
-      return new Promise(resolve=>{this.firstFrame=resolve;this.resize(true);this.publish();});
+      return new Promise((resolve,reject)=>{this.firstFrame=resolve;this.firstFrameReject=reject;this.resize(true);this.publish();});
     });
+    }catch(error){
+      this.dispose();if(/WebGL|context/i.test(error.message))error.code='WEBGL_UNAVAILABLE';throw error;
+    }
   }
+  setInteractive(value){this.interactive=value;this.controls.enabled=value;if(value){this.input.tabIndex=0;this.input.setAttribute('role','group');this.refreshLanguage();}}
   refreshLanguage(){
     const label=this.purpose==='inspect'?t('可旋转的编钟结构模型；轻点部位查看说明，方向键旋转，Shift 加方向键平移'):t('可滑动旋转的单口 3D 编钟；方向键旋转，Shift 加方向键平移，加减键缩放，Home 恢复正面');
     this.canvas.setAttribute('aria-label',label);this.input.setAttribute('aria-label',label);
@@ -224,6 +244,7 @@ export class HomeBellScene {
       }
       this.ring.position.copy(contact).addScaledVector(direction,.007);
       this.ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),direction);this.feedback=performance.now();
+      this.impacts.push({point:contact.clone(),normal:direction.clone().normalize(),at:this.feedback});this.impacts=this.impacts.slice(-3);
       clearTimeout(this.feedbackTimer);this.feedbackTimer=setTimeout(()=>{this.feedback=null;this.invalidate();},650);this.invalidate();
     }
   }
@@ -234,25 +255,28 @@ export class HomeBellScene {
       this.input.dispatchEvent(new PointerEvent('pointercancel',{pointerId}));
       if(this.input.hasPointerCapture(pointerId))this.input.releasePointerCapture(pointerId);
     }
-    this.gesture.clear();this.publish();this.audio?.suspend();this.feedback=null;clearTimeout(this.feedbackTimer);cancelAnimationFrame(this.raf);this.raf=0;
+    this.gesture?.clear();this.publish();this.feedback=null;this.impacts=[];clearTimeout(this.feedbackTimer);cancelAnimationFrame(this.raf);this.raf=0;
     if(!this.disposed&&!this.lost&&!document.hidden)this.invalidate();
   }
   invalidate(){if(!this.raf&&!this.disposed&&!this.lost&&!document.hidden)this.raf=requestAnimationFrame(time=>this.render(time));}
   finishArrival(){
-    if(!this.arriving||this.arrivalStart===null)return;
+    if(!this.arriving)return;
     this.arriving=false;this.mesh.position.y=0;this.host.dataset.arrival='settled';
-    this.impactHandled=true;this.audio?.stopLanding();
+    this.impactHandled=true;
     this.landing?.update(arrivalFrame(0,true),this.height);this.invalidate();
   }
   replayArrival(){
     if(!this.mesh||this.disposed||this.lost||this.purpose!=='audition')return;
     this.audio?.stopLanding();this.impactHandled=false;this.arriving=!this.reduced;
-    this.feedback=null;clearTimeout(this.feedbackTimer);this.ring.visible=false;
+    this.feedback=null;this.impacts=[];clearTimeout(this.feedbackTimer);this.ring.visible=false;
     this.arrivalStart=null;this.lastArrivalRender=undefined;
     this.host.dataset.arrivalAudio='pending';
     this.mesh.position.y=arrivalFrame(0,this.reduced).offset;this.invalidate();
   }
   render(time){
+    try{this.renderFrame(time);}catch(error){this.firstFrameReject?.(error);this.firstFrameReject=null;this.onError(error);}
+  }
+  renderFrame(time){
     this.raf=0;if(this.disposed||this.lost||document.hidden||!this.mesh)return;
     // High-refresh desktop panels must not multiply the entrance GPU budget.
     const arrivalInterval=time-this.arrivalStart<ARRIVAL.drop?1000/45:1000/30;
@@ -277,6 +301,18 @@ export class HomeBellScene {
     const progress=this.feedback===null||this.feedback===undefined?1:Math.min(1,(time-this.feedback)/650);
     this.ring.visible=progress<1;this.ring.scale.setScalar(this.reduced?1:1+progress*3);this.ring.material.opacity=this.reduced?.65:.7*(1-progress);
     this.material.emissive.set('#c5a45d');this.material.emissiveIntensity=progress<1?.025*(1-progress):0;
+    this.impacts=this.impacts.filter(impact=>time-impact.at<650);
+    this.mallets.forEach((mallet,index)=>{
+      const impact=this.impacts[index];mallet.visible=!!impact&&!this.reduced;
+      if(!mallet.visible)return;
+      const recoil=Math.max(0,Math.min(1,(time-impact.at-70)/410));
+      mallet.visible=recoil<1;
+      mallet.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),impact.normal);
+      const bounds=this.focusHost.getBoundingClientRect(),pixels=bounds.width<600?34:48;
+      const scale=pixels*2*Math.tan(this.camera.fov*Math.PI/360)*this.camera.position.distanceTo(impact.point)/(Math.max(1,bounds.height)*.15);
+      const fittedScale=THREE.MathUtils.clamp(scale,.6,1.5);mallet.scale.setScalar(fittedScale);
+      mallet.position.copy(impact.point).addScaledVector(impact.normal,.034*fittedScale+.003+recoil*.22);
+    });
     this.scene.updateMatrixWorld(true);this.camera.updateMatrixWorld(true);
     const direction=this.camera.position.clone().sub(this.controls.target).normalize(),front=!this.arriving&&direction.z>.12&&this.host.dataset.study!=='cavity';
     for(const label of this.labels){
@@ -288,8 +324,8 @@ export class HomeBellScene {
       this.partMarker.hidden=this.partNormal.dot(toward)<.02||!!this.cutPlane&&this.cutPlane.distanceToPoint(point)<0||Math.abs(projected.x)>1||Math.abs(projected.y)>1;
       this.partMarker.style.left=`${(projected.x+1)*this.width/2}px`;this.partMarker.style.top=`${(1-projected.y)*this.height/2}px`;
     }
-    this.renderer.render(this.scene,this.camera);this.frames++;this.publish();
-    if(this.firstFrame){this.firstFrame();this.firstFrame=null;}
+    this.renderer.render(this.scene,this.camera);if(this.shaderFailure)throw this.shaderFailure;this.frames++;this.publish();
+    if(this.firstFrame){this.firstFrame();this.firstFrame=null;this.firstFrameReject=null;}
     if(this.arriving||progress<1&&!this.reduced)this.invalidate();
   }
   publish(){
@@ -297,6 +333,7 @@ export class HomeBellScene {
     if(!this.mesh)return;
     this.host.dataset.triangles=String(this.renderer.info.render.triangles);this.host.dataset.modelCount='1';
     this.host.dataset.drawCalls=String(this.renderer.info.render.calls);
+    this.host.dataset.malletCount=String(this.mallets.filter(mallet=>mallet.visible).length);
     this.stageHost.dataset.enlarged=String(this.camera.position.distanceTo(this.controls.target)<this.distance*.9);
     this.host.dataset.camera=JSON.stringify({position:this.camera.position.toArray(),target:this.controls.target.toArray(),distance:this.camera.position.distanceTo(this.controls.target)});
     this.host.dataset.contacts=JSON.stringify(['center','left','right'].map(region=>({region,midi:region==='center'?60:64,...this.projected(ANCHORS[region==='center'?'strikeCenter':region==='left'?'strikeLeft':'strikeRight'])})));
@@ -306,15 +343,17 @@ export class HomeBellScene {
     this.onProject(this);
   }
   dispose(){
-    if(this.disposed)return;this.disposed=true;this.cancel();this.observer.disconnect();this.controls.removeEventListener('change',this.onChange);this.controls.dispose();
-    for(const [type,handler] of Object.entries(this.handlers))this.input.removeEventListener(type,handler);
-    this.input.removeEventListener('pointerdown',this.gate,true);this.input.removeEventListener('wheel',this.gate,true);
-    this.canvas.removeEventListener('webglcontextlost',this.handlers.webglcontextlost);this.canvas.removeEventListener('webglcontextrestored',this.handlers.webglcontextrestored);
+    if(this.disposed)return;this.disposed=true;this.cancel();this.firstFrameReject?.(new DOMException('Cancelled','AbortError'));this.firstFrameReject=null;
+    this.observer?.disconnect();this.controls?.removeEventListener('change',this.onChange);this.controls?.dispose();
+    for(const [type,handler] of Object.entries(this.handlers||{}))this.input?.removeEventListener(type,handler);
+    this.input?.removeEventListener('pointerdown',this.gate,true);this.input?.removeEventListener('wheel',this.gate,true);
+    if(this.handlers){this.canvas?.removeEventListener('webglcontextlost',this.handlers.webglcontextlost);this.canvas?.removeEventListener('webglcontextrestored',this.handlers.webglcontextrestored);}
     document.removeEventListener('visibilitychange',this.onHidden);window.removeEventListener('blur',this.onBlur);
-    this.material?.dispose();this.asset?.dispose();this.environment.dispose();this.ring.geometry.dispose();this.ring.material.dispose();
+    this.material?.dispose();this.asset?.dispose();this.environment?.dispose();this.ring?.geometry.dispose();this.ring?.material.dispose();
+    const geometries=new Set(),materials=new Set();for(const mallet of this.mallets)mallet.traverse(object=>{if(object.isMesh){geometries.add(object.geometry);materials.add(object.material);}});geometries.forEach(geometry=>geometry.dispose());materials.forEach(material=>material.dispose());
     this.sectionCap?.geometry.dispose();this.sectionCap?.material.dispose();
     this.landing?.dispose();
-    this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();this.labels.forEach(label=>label.element.remove());this.partMarker?.remove();
+    this.renderer?.dispose();this.renderer?.forceContextLoss();this.canvas?.remove();this.labels?.forEach(label=>label.element.remove());this.partMarker?.remove();
     this.host.dataset.activePointers='0';this.host.dataset.disposed='true';
   }
 }

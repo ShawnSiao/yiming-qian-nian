@@ -1,0 +1,12 @@
+{
+  "name": "yiming-qian-nian-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/i18n.mjs && node tests/current-model.mjs && node tests/home-arrival.mjs && node tests/mobile-viewport.mjs && node tests/practice.mjs && node tests/workspace.mjs && node tests/paired-pitches.mjs && node tests/resource-loading.mjs",
+    "test:browser": "node tests/browser-compat.mjs",
+    "build": "node scripts/build-pages.mjs && node tests/pages.mjs",
+    "start": "node scripts/serve.mjs"
+  },
+  "devDependencies": {"playwright": "1.62.1"}
+}
