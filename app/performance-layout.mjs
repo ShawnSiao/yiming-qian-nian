@@ -12,34 +12,31 @@ const BELL_ASPECT={top:300/633,middle:320/577,bottom:340/524};
 // compensation for touch; this is not a measured reconstruction of the rack.
 export function performanceLayout(width,height,{choice='auto',startOctave=4,mobile=false,portrait:portraitViewport,noteStyle='classic'}={}) {
   const portrait=width<600&&(typeof portraitViewport==='boolean'?portraitViewport:height>width);
-  const desired=choice==='single'?1:choice==='full'?3:!mobile&&height>=470?3:2;
+  const desired=choice==='single'?1:choice==='full'?3:portrait&&height>=450?3:!mobile&&height>=470?3:2;
   const gap=portrait?8:12;
   const count=BELL_PAIRS.length;
-  let columns=portrait?(width>=292?4:3):count;
+  const columns=count;
   // Paired plaques need their own line. Reserve that space before choosing
   // the number of registers, rather than shrinking the bells to fit it.
-  const minimumFrame=noteStyle==='clear'?96:126;
-  const capacity=portrait?Math.max(1,Math.min(3,Math.floor((height+gap)/(Math.ceil(count/columns)*(minimumFrame+gap))))):height>=470?3:height>=248?2:1;
+  const minimumFrame=144;
+  const capacity=portrait?Math.max(1,Math.min(3,Math.floor((height+gap)/(minimumFrame+gap)))):height>=470?3:height>=248?2:1;
   const rows=Math.min(desired,capacity),low=Math.max(3,Math.min(startOctave,7-rows));
   const styleLow=Math.min(low,4);
   const octaves=Array.from({length:rows},(_,i)=>low+rows-1-i);
-  // Landscape: all seven bells per row. Portrait wraps CDEF / GAB without
-  // removing notes; single-register focus can use larger CDE / FGA / B groups.
-  if(portrait&&rows===1&&height>=480)columns=3;
-  const framesPerRegister=portrait?Math.ceil(count/columns):1,displayRows=rows*framesPerRegister;
-  const padding=portrait?18:30,frameHeight=(height-gap*(displayRows-1))/displayRows;
+  // A complete register always occupies one row of four, in either orientation.
+  const framesPerRegister=1,displayRows=rows;
+  const padding=portrait?17:30,frameHeight=(height-gap*(displayRows-1))/displayRows;
   const cellWidth=(width-padding*2)/columns;
   const labelSpace=noteStyle==='pairs'?44:noteStyle==='classic'?36:(portrait?8:23);
-  const maxHeight=Math.min(frameHeight-labelSpace,(cellWidth-8)/BELL_ASPECT.bottom,mobile?245:340);
   const frames=Array.from({length:displayRows},(_,row)=>({top:row*(frameHeight+gap),height:frameHeight}));
   const bells=octaves.flatMap((octave,row)=>Array.from({length:count},(_,column)=>{
-    const data=bellAt(octave,column),group=portrait?Math.floor(column/columns):0,frame=row*framesPerRegister+group;
-    const count=portrait?Math.min(columns,BELL_PAIRS.length-group*columns):BELL_PAIRS.length;
-    const cx=padding+(portrait?(column%columns)+(columns-count)/2:column)*cellWidth+cellWidth/2;
+    const data=bellAt(octave,column),frame=row;
+    const cx=padding+column*cellWidth+cellWidth/2;
     // Small phones need legible complete silhouettes and room for two 44px
     // entrances. Desktop retains a stronger large-to-small graduation.
-    const ratio=portrait||width<620||(mobile&&frameHeight<144)?[1,.98,.96,.94,.92,.90,.88][column]:mobile?[1,.96,.92,.89,.85,.82,.78][column]:data.sizeRatio;
+    const ratio=portrait||width<620?[1,.98,.95,.92][column]:mobile?[1,.96,.9,.86][column]:data.sizeRatio;
     const imageKey=performanceBellStyle(octave,styleLow);
+    const maxHeight=Math.min(frameHeight-labelSpace,(cellWidth-8)/BELL_ASPECT[imageKey],mobile?300:400);
     const h=maxHeight*ratio,w=h*BELL_ASPECT[imageKey],y=frames[frame].top+(portrait?8:13);
     const points={center:{x:cx,y:y+h*.66},left:{x:cx-w*.33,y:y+h*.79},right:{x:cx+w*.33,y:y+h*.79}};
     const sideY=Math.min(frames[frame].top+frameHeight-(portrait?22:25),Math.max(frames[frame].top+(portrait?74:79),points.right.y));

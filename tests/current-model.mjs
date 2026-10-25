@@ -11,7 +11,7 @@ let checks=0;const check=(ok,message)=>{assert.ok(ok,message);checks++;};
 for(const [width,height,mobile,portrait] of [[276,270,true,true],[342,570,true,true],[382,650,true,true],[520,214,true,false],[796,270,true,false],[980,600,false,false],[1396,1000,false,false]]){
   for(const noteStyle of ['pairs','clear','classic'])for(const low of [3,4,5]){
     const l=performanceLayout(width,height,{mobile,portrait,startOctave:low,noteStyle}),tags=l.bells.flatMap(b=>bellNoteTags(l,b));
-    check([7,14,21].includes(l.bells.length)&&l.bells.length===l.rows*7,'every mode retains complete seven-bell banks');
+    check([4,8,12].includes(l.bells.length)&&l.bells.length===l.rows*4&&l.columns===4,'every mode retains complete four-bell banks');
     for(const b of l.bells){
       check(b.data.centerMidi%12===BELL_PAIRS[b.column].center&&b.data.sideMidi-b.data.centerMidi===BELL_PAIRS[b.column].side-BELL_PAIRS[b.column].center,'display alternatives preserve the agreed pitch pairing');
       check(b.targets.every(t=>t.width===44&&t.height===44),'primary strike entrances remain 44 CSS px');

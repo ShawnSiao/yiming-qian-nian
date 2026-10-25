@@ -10,7 +10,7 @@ Explore a Chinese bronze chime bell, hear how one bell can produce two tones, an
 
 - **Hear the difference.** Tap the center and either side of the large 2D bell on the home screen, or use Enter/Space and the left/right arrows. The lightweight entrance never blocks playing or navigation.
 - **Play a phrase.** Choose a score, hear a demonstration, then follow the highlighted striking area. Wait mode advances only after the correct note; timed mode follows a beat.
-- **Keep the bells playable on a phone.** The stage adapts between 7, 14 and 21 bells. Narrow portrait screens wrap each seven-bell register into two visual lines. Change the pitch range when a melody moves beyond the visible bells. Landscape provides more room.
+- **Keep the bells playable on a phone.** The stage adapts between 4, 8 and 12 bells, with exactly four in each row. Focus on one register for larger bells, or expand the available registers. Change range without changing the notes' pitches.
 - **Read while playing.** Wide screens place a resizable score beside the bells. Phones retain a compact phrase strip beneath the stage.
 - **Save an idea.** Record your strikes, name the piece when saving, rename it later, and replay it from **Saved**. These are note-event recordings, not microphone recordings or audio files.
 - **Look inside.** Select structural parts in the observation page; the cavity has a pre-rendered section image. Turn on **3D** to rotate, zoom, pan or open a live cutaway. Explanations link to museum and research sources.
@@ -19,25 +19,22 @@ The interface supports English and Simplified Chinese. A first visit follows the
 
 ## Notes and range
 
-English pitch labels use scientific pitch notation: **C4** is middle C; **F♯4** is F-sharp above it. The Chinese interface retains the original small-letter octave labels.
+English pitch labels use scientific pitch notation: **C4** is middle C. Chinese labels show **C4/E4 as c¹/e¹**, **C5/E5 as c²/e²**, and so on. These labels do not transpose the sound.
 
 Numbered scores use scale degrees **1–7**. `1=C` makes 1 equal C; `1=F` makes it F. Dots above or below move a note by an octave. The pitch name beneath each score note identifies the corresponding bell.
 
-Each register retains seven natural center notes, from C through B, with this modern performance mapping:
+Each register has four bells with this modern performance mapping. Both lower corners sound the same side note:
 
 | Bell center | Either side |
 | --- | --- |
 | C | E |
 | D | F |
-| E | G |
-| F | F♯ |
 | G | B |
 | A | C in the next octave |
-| B | D in the next octave |
 
-Selectable center notes span **C3–B6**; the highest A-bell side reaches **C7**, and the B-bell side reaches **D7**. Playability and automatic register changes follow the actual visible striking points. This mapping includes natural notes and F-sharp; it is **not a complete chromatic instrument**. Pitch pairs and seven-bell groups are an interaction design, not a reconstruction of the tuning of a particular excavated set.
+The selectable registers cover the natural notes **C3–C7**; three rows starting at C4 provide **22 distinct pitches, C4–C7**. Neighboring registers share their boundary C. This layout has no F-sharp or other accidentals: scores requiring missing pitches remain readable and are marked **Missing pitches**, with ensemble previews and practice unavailable. No score notes are removed or retuned. Four-bell groups are this project's interaction design, not a reconstruction of the tuning of a particular excavated set.
 
-Existing recordings keep their saved MIDI pitches. Old E/E and B/B side strikes replay those original notes and highlight an appropriate center point; their stored events are not rewritten.
+Existing recordings keep their saved MIDI pitches and storage identity. A note highlights a matching point on the current rack when available; otherwise it still sounds at its saved pitch, without a false highlight. Stored events are not rewritten.
 
 ## Scores
 

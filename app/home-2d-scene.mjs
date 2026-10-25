@@ -4,6 +4,7 @@ import {drawBellPlaceholder} from './bell-placeholder.mjs';
 import {HomeGesture,homeStrikeRegion} from './home-interaction.mjs';
 import {ARRIVAL,arrivalFrame,dustParticle} from './home-arrival.mjs';
 import {BELL_PARTS} from './data/bell-structure.mjs';
+import {homeMalletFeedback,drawHomeMallet} from './strike-feedback.mjs';
 
 // The always-available instrument. No renderer, GLB or three.js dependency.
 export class Home2DScene {
@@ -120,10 +121,9 @@ export class Home2DScene {
       const p=this.point(effect.region),age=time-effect.at,fade=Math.max(0,1-age/820);ctx.save();ctx.globalAlpha=fade;ctx.strokeStyle='#c5a45d';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.arc(p.x,p.y,10+(this.reduced?0:age*.035),0,Math.PI*2);ctx.stroke();
       if(!this.reduced){
-        const recoil=Math.max(0,Math.min(1,(age-70)/410)),h=this.width<600?190:280,w=h*143/640,mallet=this.images.mallet;
-        ctx.globalAlpha=1-recoil;ctx.translate(p.x+(effect.region==='left'?-1:1)*recoil*16,p.y+recoil*18);
-        if(mallet)ctx.drawImage(mallet,-w/2,-h*.14,w,h);
-        else{ctx.fillStyle='#c5a45d';ctx.fillRect(-17,-7,34,14);ctx.fillRect(-3,4,6,h*.6);}
+        const feedback=homeMalletFeedback(age,this.width);
+        ctx.globalAlpha=feedback.alpha;ctx.translate(p.x+(effect.region==='left'?-1:1)*feedback.offsetX,p.y+feedback.offsetY);
+        drawHomeMallet(ctx,this.images.mallet,feedback.height);this.host.dataset.malletHeight=String(feedback.height);
       }ctx.restore();
     }
     if(this.purpose==='inspect'&&this.part&&this.part!=='overview'){

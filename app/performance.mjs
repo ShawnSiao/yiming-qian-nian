@@ -78,7 +78,7 @@ export class PerformanceScene {
     for(const type of ['pointerup','pointercancel','lostpointercapture'])this.surface.addEventListener(type,this.handleRelease);
     this.handleKey=event=>{
       if(!this.canPlay()||event.repeat||event.ctrlKey||event.altKey||event.metaKey||document.querySelector('dialog[open]')||/INPUT|SELECT|TEXTAREA/.test(event.target.tagName))return;
-      const keys=['1234567','qwertyu','asdfghj'],row=keys.findIndex(k=>k.includes(event.key.toLowerCase()));
+      const keys=['1234','qwer','asdf'],row=keys.findIndex(k=>k.includes(event.key.toLowerCase()));
       if(row<0||row>=this.layout.rows)return;
       const column=keys[row].indexOf(event.key.toLowerCase()),bell=this.layout.bells.find(b=>b.row===row&&b.column===column);
       if(bell){event.preventDefault();this.strike(bell,event.shiftKey?'right':'center','keyboard');}
