@@ -3,6 +3,7 @@ import {pitchLabel,registerLabel,registerRange,unsupportedPitches} from './paire
 import {formatTime} from './session.mjs';
 import {BELL_PARTS,BELL_OVERVIEW,STRUCTURE_SOURCES} from './data/bell-structure.mjs';
 import {measuresFor} from './practice-model.mjs';
+import {displayPitch} from './pitch-display.mjs';
 
 const {createElement:h,useEffect,useRef}=window.React;
 const iconPaths={
@@ -23,7 +24,7 @@ export function Header({view,onView,onSettings,onMore,onLanguage,context,feedbac
     h('nav',{'aria-label':t('主导航')},[['play',t('演奏')],['library',t('乐谱')],['observe',t('观赏')],['works',t('我的')]].map(([id,label])=>h('button',{key:id,onClick:()=>onView(id),'aria-current':view===id?'page':undefined},label))),
     view==='play'&&h('p',{className:'compact-play-context','aria-live':'polite'},h('span',null,context),h('strong',null,feedback)),
     view==='play'&&h('div',{className:'compact-play-controls'},playControls),
-    h('div',{className:'header-tools'},modelControl,h('button',{className:'quiet language-toggle',onClick:onLanguage,'aria-label':getLocale()==='en'?'Switch to Chinese':'切换为英文',title:getLocale()==='en'?'Switch to Chinese':'切换为英文'},getLocale()==='en'?'中文':'EN'),view==='home'&&h('button',{className:'icon-button home-more-entry',onClick:onMore,'aria-label':t('更多选项')},h(Icon,{name:'menu'})),view==='play'&&h('button',{className:'quiet settings-entry',onClick:onSettings,'aria-label':t('练习设置')},t('练习设置'))));
+    h('div',{className:'header-tools'},modelControl,h('button',{className:'quiet language-toggle',onClick:onLanguage,'aria-label':getLocale()==='en'?'Switch to Chinese':'切换为英文',title:getLocale()==='en'?'Switch to Chinese':'切换为英文'},getLocale()==='en'?'中文':'EN'),view==='home'&&h('button',{className:'icon-button home-more-entry',onClick:onMore,'aria-label':t('更多选项')},h(Icon,{name:'menu'})),view==='play'&&h('button',{className:'quiet settings-entry',onClick:onSettings,'aria-label':t('练习设置')},h('span',{className:'settings-full-label'},t('练习设置')),h('span',{className:'settings-short-label','aria-hidden':true},t('设置')))));
 }
 export const homeThemes={
   relief:{label:'纹饰',text:'钟乳与带状纹饰沿钟身排列，转动可以看见浮雕层次。'},
@@ -57,9 +58,10 @@ export function HomeStudy({theme,onTheme,onZoom,onReset,onObserve,ready,arrivalA
     h('div',{className:'study-links'},h('button',{className:'study-link',onClick:onObserve},t('观察钟体结构'),h(Icon,{name:'eye'})),h('div',{className:'home-audio-tools'},h('div',{className:'arrival-sound'},h('button',{className:'text-button',onClick:onArrival,'aria-label':t('重听落钟声')},h(Icon,{name:'sound'}),t('重听落钟'))),h('label',{className:'home-volume'},h('span',null,t('音量')),h('input',{type:'range',min:0,max:100,step:1,value:Math.round(volume*100),'aria-label':t('首页钟声音量'),'aria-valuetext':`${Math.round(volume*100)}%`,onChange:e=>onVolume(Number(e.target.value)/100)}),h('output',null,`${Math.round(volume*100)}%`)))));
 }
 export function Note({note,current=false,played=false,onAudition}){
-  return h('button',{className:`score-note${current?' current':''}${played?' played':''}`,onClick:()=>onAudition(note.midi),'aria-current':current?'step':undefined,'aria-label':tr`试听简谱 ${note.accidental||''}${note.degree}，音名 ${pitchLabel(note.midi)}，${note.duration} 拍${note.uncertain?t('，待核对'):''}`},
+  const rest=!Number.isInteger(note.midi),silent=rest||note.tie,duration=note.notatedDuration??note.duration;
+  return h('button',{className:`score-note${current?' current':''}${played?' played':''}${rest?' is-rest':''}${note.tie?' is-tie':''}${note.grace?' is-grace':''}`,disabled:silent,onClick:silent?undefined:()=>onAudition(note.midi),'aria-current':current?'step':undefined,'aria-label':rest?tr`休止 ${duration} 拍`:note.tie?tr`延续前音 ${duration} 拍`:tr`试听简谱 ${note.accidental||''}${note.degree}，音名 ${pitchLabel(note.midi)}，${duration} 拍${note.uncertain?t('，待核对'):''}`},
     h('span',{className:'notation'},h('sup',null,note.octave>0?'·'.repeat(note.octave):''),h('b',null,`${note.accidental||''}${note.degree}`),h('sub',null,note.octave<0?'·'.repeat(-note.octave):''),note.uncertain&&h('i',null,'＊')),
-    h('span',{className:'note-pitch'},pitchLabel(note.midi)),h('small',null,tr`${note.duration}拍`));
+    h('span',{className:'note-pitch'},rest?'—':pitchLabel(note.midi)),h('small',null,tr`${duration}拍`));
 }
 export function ScoreAside({song,measures,bar,index,active,onBar,onPractice,onListen,onAudition,playable=true}){
   const list=useRef(null);
@@ -67,7 +69,8 @@ export function ScoreAside({song,measures,bar,index,active,onBar,onPractice,onLi
   return h('aside',{className:'score-aside','aria-label':t('对照乐谱')},
     h('div',{className:'score-heading'},h('p',{className:'eyebrow'},t('边看谱，边落槌')),h('h2',null,t(song.title)),h('p',null,`1=${song.scoreKey||'C'} · ${song.bpm} BPM · ${measures.length} ${song.jianpuBars?t('小节'):t('乐句')}`)),
     song.transcriptionStatus&&h('p',{className:'draft-note'},t('录音转谱初稿 · ＊为待核对击音')),
-    h('div',{className:'measure-list',ref:list},measures.map((m,i)=>h('section',{key:i,className:i===bar?'measure selected':'measure'},h('button',{className:'measure-select',onClick:()=>onBar(i),'aria-label':t(m.label),'aria-current':i===bar?'step':undefined},h('span',null,String(i+1).padStart(2,'0')),h('strong',null,m.notes.map(n=>`${n.accidental||''}${n.degree}${n.uncertain?'＊':''}`).join('　'))),i===bar&&h('div',{className:'measure-detail'},m.notes.map((n,j)=>h(Note,{key:j,note:n,current:active&&j===index,played:active&&j<index,onAudition})))))),
+    song.scoreWarning&&!song.sourceAudio&&h('p',{className:'score-scope'},t(song.scoreWarning)),
+    h('div',{className:'measure-list',ref:list},measures.map((m,i)=>h('section',{key:i,className:i===bar?'measure selected':'measure'},h('button',{className:'measure-select',onClick:()=>onBar(i),'aria-label':t(m.label),'aria-current':i===bar?'step':undefined},h('span',null,String(i+1).padStart(2,'0')),h('strong',null,(m.displayNotes||m.notes).map(n=>`${n.accidental||''}${n.degree}${n.uncertain?'＊':''}`).join('　'))),i===bar&&h('div',{className:'measure-detail'},(m.displayNotes||m.notes).map((n,j)=>h(Note,{key:j,note:n,current:active&&n.playIndex===index,played:active&&n.playIndex!==null&&n.playIndex<index,onAudition})))))),
     !playable&&h('p',{className:'pitch-availability'},t('当前曲谱含未设置击点的音，请换曲。')),
     h('div',{className:'score-aside-actions'},h('button',{className:'secondary',disabled:!playable,onClick:onListen},t('听这一句')),h('button',{className:'primary',disabled:!playable,onClick:onPractice},t('跟着敲'))));
 }
@@ -77,7 +80,7 @@ export function PhraseStrip({measure,bar,count,index,phase,paused,feedback,onPre
   useEffect(()=>{run.current?.querySelector('[aria-current=step]')?.scrollIntoView({block:'nearest',inline:'center',behavior:'auto'});},[index,phase]);
   return h('footer',{className:'practice-footer','data-phase':phase},
     h('div',{className:'phrase-status','aria-live':'polite'},h('span',{className:'phrase-count'},recording?t('录钟曲'):playback?t('作品回放'):`${bar+1} / ${count} ${measure.label.includes('小节')?t('小节'):t('乐句')}`),h('strong',null,recording?tr`已录 ${recordCount} 次落槌 · ${formatTime(elapsed)}`:!playable&&!playback?t('当前曲谱含未设置击点的音，请换曲。'):feedback),h('span',{className:'step-count'},active&&!playback?tr`${Math.min(index+1,measure.notes.length)} / ${measure.notes.length} 击`:t('一组四口 · 中央与两角可敲'))),
-    playback||recording?h('div',{className:'playback-summary'},recording?t('轻敲钟面，保存这一段灵感。'):playback):h('div',{className:'phrase-strip','aria-label':t('当前乐句')},h('button',{className:'icon-button',disabled:bar===0,onClick:onPrev,'aria-label':t('上一句')},'‹'),h('div',{className:'note-run',ref:run},measure.notes.map((n,j)=>h(Note,{key:j,note:n,current:active&&j===index,played:active&&j<index,onAudition}))),h('button',{className:'icon-button',disabled:bar===count-1,onClick:onNext,'aria-label':t('下一句')},'›')),
+    playback||recording?h('div',{className:'playback-summary'},recording?t('轻敲钟面，保存这一段灵感。'):playback):h('div',{className:'phrase-strip','aria-label':t('当前乐句')},h('button',{className:'icon-button',disabled:bar===0,onClick:onPrev,'aria-label':t('上一句')},'‹'),h('div',{className:'note-run',ref:run},(measure.displayNotes||measure.notes).map((n,j)=>h(Note,{key:j,note:n,current:active&&n.playIndex===index,played:active&&n.playIndex!==null&&n.playIndex<index,onAudition}))),h('button',{className:'icon-button',disabled:bar===count-1,onClick:onNext,'aria-label':t('下一句')},'›')),
     h('div',{className:`transport-controls${recording?' recording-controls':''}`},recording?h('button',{className:'secondary is-recording',onClick:onRecord},'■',tr`保存 ${formatTime(elapsed)}`):active?h('button',{className:'secondary',onClick:onPause},h(Icon,{name:paused?'play':'pause'}),paused?t('继续'):t('暂停')):h('button',{className:'secondary',disabled:!playable,onClick:onListen},h(Icon,{name:'play'}),t('听这一句')),
       !recording&&(
       active?h('button',{className:'text-button',onClick:onStop},playback?t('结束回放'):phase==='listen'?t('停止试听'):t('结束练习')):done?h('button',{className:'primary',onClick:bar===count-1?onRetry:onNext},bar===count-1?t('再练这一句'):t('下一句'),h(Icon,{name:'play'})):h('button',{className:'primary',disabled:!playable,onClick:onPractice},t('跟着敲'),h(Icon,{name:'play'}))),
@@ -85,6 +88,16 @@ export function PhraseStrip({measure,bar,count,index,phase,paused,feedback,onPre
 }
 export function BankPicker({low,rows,onBank,disabled=false}){
   return h('label',{className:'bank-picker'},h('span',null,t('音组')),h('select',{'aria-label':t('切换音组'),value:low,disabled,onChange:e=>onBank(Number(e.target.value))},Array.from({length:5-rows},(_,i)=>i+3).map(n=>h('option',{key:n,value:n},registerRange(n,rows)))));
+}
+export function NotationControl({notation,scoreKey,onChange}){
+  const numbered=notation==='numbered';
+  return h('div',{className:'notation-control'},h('button',{type:'button',className:'text-button notation-toggle','aria-label':t('数字简谱'),'aria-pressed':numbered,title:t(numbered?'切换为音名':'切换为数字简谱'),onClick:()=>onChange(numbered?'pitch':'numbered')},h('span',null,t(numbered?'简谱':'音名')),h('span',{className:'notation-swap','aria-hidden':true},'⇄')),numbered&&h('span',{className:'notation-key'},`1=${scoreKey}`));
+}
+export function PitchMark({midi,notation,scoreKey}){
+  const {text,octave,description}=displayPitch(midi,notation,scoreKey);
+  if(notation!=='numbered')return text;
+  const dots=(position,count)=>h('span',{className:`pitch-dots ${position}`,'aria-hidden':true},Array.from({length:count},(_,i)=>h('i',{key:i})));
+  return h('span',{className:'numbered-pitch','aria-label':description},text.startsWith('♯')&&h('span',{className:'pitch-accidental'},'♯'),h('span',{className:'pitch-number'},octave>0&&dots('above',octave),h('b',null,text.slice(-1)),octave<0&&dots('below',-octave)));
 }
 export function SourceCompare({song,onSource}){
   const player=useRef(null);
@@ -114,7 +127,7 @@ export function LibraryPage({songs,selected,filter,onFilter,onSelect,onStart,onL
           selected.id===s.id&&h('div',{className:'song-inline-preview'},h('p',null,t(s.description)),s.transcriptionStatus&&h('p',{className:'draft-note'},t('录音转谱初稿，＊为待核对击音。')),h('button',{className:'secondary',onClick:()=>onBar(s,0)},t('查看曲谱'),h(Icon,{name:'book'})),h(SourceCompare,{song:s,onSource})));
       }))),
       h('aside',{className:'library-score','aria-label':t('所选曲谱')},h('p',{className:'eyebrow'},t('所选曲谱')),h('h2',null,t(selected.title)),h('p',{className:'song-description'},t(selected.description)),selected.transcriptionStatus&&h('p',{className:'draft-note'},t('录音转谱初稿，未完成逐音听校。＊为待核对击音。')),h('p',{className:'score-meta'},`1=${selected.scoreKey||'C'} · ${selected.bpm} BPM`),
-        h('div',{className:'library-bars'},measures.map((m,i)=>h('button',{key:i,className:'library-bar',onClick:()=>onBar(selected,i),'aria-label':tr`看谱演奏${t(m.label)}`},h('small',null,String(i+1).padStart(2,'0')),h('span',null,m.notes.map(n=>`${n.accidental||''}${n.degree}${n.uncertain?'＊':''}`).join('　'))))),
+        h('div',{className:'library-bars'},measures.map((m,i)=>h('button',{key:i,className:'library-bar',onClick:()=>onBar(selected,i),'aria-label':tr`看谱演奏${t(m.label)}`},h('small',null,String(i+1).padStart(2,'0')),h('span',null,(m.displayNotes||m.notes).map(n=>`${n.accidental||''}${n.degree}${n.uncertain?'＊':''}`).join('　'))))),
         selectedMissing.length>0&&h('p',{className:'pitch-availability'},tr`待补音：${selectedMissing.map(pitchLabel).join('、')}`),
         h(SourceCompare,{song:selected,onSource}),h('div',{className:'library-score-actions'},h('button',{className:'secondary',disabled:selectedMissing.length>0,onClick:()=>onListen(selected)},t('听示范')),h('button',{className:'primary',disabled:selectedMissing.length>0,onClick:()=>onStart(selected,0)},t('逐句练习'))))));
 }

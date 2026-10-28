@@ -1,5 +1,6 @@
 import { resolveStrikeRegion } from './model.mjs';
 import { BELL_PAIRS, pairedBellAt as bellAt } from './paired-instrument.mjs';
+import {displayPitch} from './pitch-display.mjs';
 
 // Preserve main's three distinct silhouettes. Lower/middle/upper voices use
 // the large/medium/small original, including when only two registers are shown.
@@ -10,7 +11,7 @@ const BELL_ASPECT={top:300/633,middle:320/577,bottom:340/524};
 
 // Main's full bell silhouettes, not cropped 3D meshes. Sizes are display
 // compensation for touch; this is not a measured reconstruction of the rack.
-export function performanceLayout(width,height,{choice='auto',startOctave=4,mobile=false,portrait:portraitViewport,noteStyle='classic'}={}) {
+export function performanceLayout(width,height,{choice='auto',startOctave=4,mobile=false,portrait:portraitViewport,noteStyle='classic',notation='pitch',notationKey='C'}={}) {
   const portrait=width<600&&(typeof portraitViewport==='boolean'?portraitViewport:height>width);
   const desired=choice==='single'?1:choice==='full'?3:portrait&&height>=450?3:!mobile&&height>=470?3:2;
   const gap=portrait?8:12;
@@ -45,7 +46,7 @@ export function performanceLayout(width,height,{choice='auto',startOctave=4,mobi
       .map(t=>({...t,key:`${data.id}:${t.region}`,id:data.id,zone:t.region,width:44,height:44}));
     return {data,row,column,frame,imageKey,cx,x:cx-w/2,y,width:w,height:h,points,targets,cellWidth};
   }));
-  return {width,height,viewportWidth:width,viewportHeight:height,rows,low,styleLow,octaves,portrait,displayRows,framesPerRegister,frames,columns,cellWidth,bells,mobile,noteStyle,
+  return {width,height,viewportWidth:width,viewportHeight:height,rows,low,styleLow,octaves,portrait,displayRows,framesPerRegister,frames,columns,cellWidth,bells,mobile,noteStyle,notation,notationKey,
     compact:true,requested:choice,fallback:rows<desired,renderer:'main-canvas',minBodyWidth:mobile?36:26,minBodyHeight:mobile?48:36};
 }
 
@@ -59,6 +60,7 @@ export function performanceLayoutChanged(previous,next){
 // lower corners. Keep a legibility floor rather than shrinking with the bell.
 // Both sides always repeat the side pitch, including the A/next-C octave crossing.
 export function bellNoteTags(layout,bell) {
+  const pitch=region=>displayPitch(bell.data[region==='center'?'centerMidi':'sideMidi'],layout.notation,layout.notationKey);
   if(layout.noteStyle==='pairs'){
     const width=Math.min(72,(bell.cellWidth-14)/2),gap=4,height=32;
     const y=Math.min(bell.y+bell.height+5,layout.frames[bell.frame].top+layout.frames[bell.frame].height-height-3);
@@ -72,15 +74,16 @@ export function bellNoteTags(layout,bell) {
       return {id:bell.data.id,key:`${bell.data.id}:${region}`,region,text,fontSize:size,width,height,x:bell.cx+(region==='center'?0:region==='left'?-span:span)-width/2,y:bell.y+bell.height*level-height/2,variant:'clear'};
     }).filter(t=>t.region!=='left'||t.width*2+8<=bell.cellWidth);
   }
-  return [['center',bell.data.centerName],['left',bell.data.sideName],['right',bell.data.sideName]].map(([region,text])=>{
+  return ['center','left','right'].map(region=>{
+    const display=pitch(region),{text,octave}=display;
     const isCenter=region==='center',fontSize=isCenter?(layout.mobile?15:16):(layout.mobile?13:14);
-    const width=Math.max(region==='center'?22:18,Math.ceil(text.length*fontSize*.60+7));
-    const height=fontSize+(region==='center'?5:4);
+    const width=Math.max(layout.notation==='numbered'?26:region==='center'?22:18,Math.ceil(text.length*fontSize*.60+7));
+    const height=fontSize+(octave?12:region==='center'?5:4);
     const sign=region==='left'?-1:1,cornerX=bell.cx+sign*bell.width*.43,cornerY=bell.y+bell.height*.96;
     const span=Math.min(bell.width*.43,(bell.cellWidth-width-8)/2);
     const x=Math.max(5,Math.min(layout.width-width-5,bell.cx+(isCenter?0:sign*span)-width/2));
     const y=isCenter?bell.y+bell.height*.15-height/2:Math.min(cornerY+4,layout.frames[bell.frame].top+layout.frames[bell.frame].height-height-2);
-    return {id:bell.data.id,key:`${bell.data.id}:${region}`,region,text,fontSize,width,height,x,y,...(!isCenter?{anchorX:cornerX,anchorY:cornerY}:{} )};
+    return {id:bell.data.id,key:`${bell.data.id}:${region}`,region,...display,fontSize,width,height,x,y,...(!isCenter?{anchorX:cornerX,anchorY:cornerY}:{} )};
   });
 }
 

@@ -75,6 +75,115 @@ async function test(browser,engine,name,run,options={}){
   finally{await context.close();await writeFile(resolve(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
 }
 async function core(browser,engine){
+  await test(browser,engine,'yanhua-library-and-practice',async(page,context,requests)=>{
+    await open(page,'library');const row=page.locator('.song-list [data-song-id="yanhua-yi-leng"]');
+    await row.locator('.song-info').click();assert.equal(await row.getAttribute('data-playable'),'true');
+    assert.equal(await row.locator('.song-preview').isDisabled(),false);assert.match(await row.locator('.song-inline-preview').textContent(),/28 小节正文/);
+    await shot(page,`${engine}-yanhua-library-zh`);
+    await row.locator('.song-practice').click();await page.locator('.bell-app[data-phase="wait"]').waitFor();
+    assert.equal(await page.locator('.phrase-strip .is-rest').count(),1);assert.ok(await page.locator('.phrase-strip .is-rest').isDisabled());
+    assert.equal(await page.locator('.phrase-strip .score-note[aria-current="step"]').getAttribute('aria-label'),'试听简谱 3，音名 e¹，0.5 拍');
+    await page.locator('.notation-toggle:visible').first().click();
+    for(const [i,midi] of [64,64,67].entries()){await playMidi(page,midi);await page.locator(`.bell-app[data-step="${i+1}"]`).waitFor();}
+    await page.locator('.bell-app[data-phase="done"]').waitFor();
+    await page.locator('.measure-select[aria-label="第 5 小节"]').click();
+    assert.equal(await page.locator('.measure.selected .is-tie').count(),2);assert.equal(await page.locator('.measure.selected .is-rest').count(),1);
+    await page.locator('.measure-select[aria-label="第 21 小节"]').click();assert.equal(await page.locator('.measure.selected .is-grace').count(),2);
+    await page.locator('.score-aside-actions .primary').click();await page.locator('.bell-app[data-phase="wait"]').waitFor();
+    for(const [i,midi] of [76,74,76,76,76].entries()){await playMidi(page,midi);await page.locator(`.bell-app[data-step="${i+1}"]`).waitFor();}
+    await page.locator('.bell-app[data-phase="done"]').waitFor();
+    await page.locator('.measure-select[aria-label="第 23 小节"]').click();await playMidi(page,81);await shot(page,`${engine}-yanhua-score-with-dots`);
+    await page.setViewportSize({width:390,height:844});await shot(page,`${engine}-yanhua-phone-score`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await page.getByRole('button',{name:'切换为英文',exact:true}).click();assert.match(await page.locator('.play-topline h1').textContent(),/Yan Hua Yi Leng/);
+    await nav(page,1);assert.match(await page.locator('.song-list [data-song-id="yanhua-yi-leng"] .song-info strong').textContent(),/Sheet excerpt/);
+    assert.equal(await page.locator('.song-list [data-song-id^="zhuzhi-ci"]').count(),2);
+    assert.equal(requests.filter(heavy).length,0);
+    return {bars:29,strikes:154,restDisabled:true,tiesNotRestruck:true,graceNotes:[76,74,76]};
+  });
+  if(engine==='chromium')await test(browser,engine,'yanhua-full-listen',async(page,context,requests)=>{
+    await open(page,'library');
+    await page.evaluate(async()=>{const {PerformanceScene}=await import('./performance.mjs'),original=PerformanceScene.prototype.strikeMidi;window.__yanhuaMidi=[];PerformanceScene.prototype.strikeMidi=function(midi,...args){window.__yanhuaMidi.push(midi);return original.call(this,midi,...args);};});
+    await page.locator('.song-list [data-song-id="yanhua-yi-leng"] .song-preview').click();
+    await page.locator('.bell-app[data-phase="listen"]').waitFor();
+    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.lastMidi==='64');
+    await page.locator('.notation-toggle:visible').first().click();
+    assert.equal(await page.locator('.bell-app').getAttribute('data-phase'),'listen');assert.equal(await page.locator('.bell-app').getAttribute('data-paused'),'false');
+    await page.locator('.bell-app[data-phase="free"]').waitFor({timeout:100000});
+    const history=await page.evaluate(async()=>{const {yanhuaYiLeng:s}=await import('./data/yanhua-yi-leng.mjs');const e=document.querySelector('.main-performance-surface');return {count:Number(e.dataset.eventCount),last:Number(e.dataset.lastMidi),audio:Number(e.dataset.audioNotesStarted),duration:s.durationMs,actual:window.__yanhuaMidi,expected:s.events.map(n=>n.midi)};});
+    // The scene intentionally keeps only its last 128 events. Check all 154
+    // actual MIDI dispatches independently, including the ornaments and ties.
+    assert.deepEqual(history.actual,history.expected);assert.equal(history.last,76);assert.equal(history.count,128);assert.ok(history.audio>=154);
+    assert.equal(history.duration,88831);assert.match(await page.locator('.phrase-status strong').textContent(),/试听结束/);
+    await shot(page,`${engine}-yanhua-full-listen-completed`);assert.equal(requests.filter(heavy).length,0);
+    return {...history,realTimePlayback:true};
+  });
+  await test(browser,engine,'numbered-notation',async(page,context,requests)=>{
+    await open(page,'play');const surface=page.locator('.main-performance-surface');
+    await surface.locator('.strike-target').first().waitFor({state:'attached'});
+    const toggle=()=>page.locator('.notation-toggle:visible').first();
+    assert.equal(await toggle().getAttribute('aria-pressed'),'false');
+    await hit(page,'bell-4-c','center',60);
+    await page.evaluate(async()=>{const {BellAudio}=await import('./audio.mjs');window.__notationStops=0;const stop=BellAudio.prototype.stop;BellAudio.prototype.stop=function(...args){window.__notationStops++;return stop.apply(this,args);};});
+    const targets=await surface.getAttribute('data-targets'),contacts=await surface.getAttribute('data-contacts');
+    await toggle().click();await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.notation==='numbered');
+    assert.equal(await surface.getAttribute('data-targets'),targets);assert.equal(await surface.getAttribute('data-contacts'),contacts);
+    assert.equal(await page.evaluate(()=>window.__notationStops),0,'Notation does not stop a ringing bell');
+    const liveAudio=await page.evaluate(()=>!!(window.AudioContext||window.webkitAudioContext));
+    if(liveAudio)assert.match(await page.locator('.phrase-status strong').textContent(),/^1 ·/,'Existing feedback switches too');
+    else report.limits.push(`${engine}: this test build has no Web Audio API; its sound-unavailable notice takes priority over strike feedback.`);
+    const plaques=JSON.parse(await surface.getAttribute('data-note-plaques'));
+    for(const [id,center,side,sideOctave] of [['c','1','3',0],['d','2','4',0],['g','5','7',0],['a','6','1',1]]){
+      assert.equal(plaques.find(t=>t.id===`bell-4-${id}`&&t.region==='center').text,center);
+      const sides=plaques.filter(t=>t.id===`bell-4-${id}`&&t.region!=='center');assert.equal(sides.length,2);
+      assert.ok(sides.every(t=>t.text===side&&t.octave===sideOctave));
+    }
+    await shot(page,`${engine}-numbered-desktop-c`);
+    await nav(page,1);await page.getByRole('button',{name:'开始第一句',exact:true}).click();
+    await page.locator('.bell-app[data-phase="wait"]').waitFor();
+    assert.equal(await surface.getAttribute('data-notation'),'numbered','Mode survives navigation');
+    assert.equal(await page.locator('.target-caption .numbered-pitch').getAttribute('aria-label'),'6，下加 1 点');
+    await toggle().click();assert.match(await page.locator('.target-caption').textContent(),/6 · a/);
+    assert.equal(await page.locator('.bell-app').getAttribute('data-step'),'0');assert.equal(await page.locator('.bell-app').getAttribute('data-paused'),'false');
+    await toggle().click();
+    for(const [index,midi] of [57,62,62,60,62].entries()){await playMidi(page,midi);await page.locator(`.bell-app[data-step="${index+1}"]`).waitFor();}
+    await page.locator('.bell-app[data-phase="done"]').waitFor();
+    await page.getByRole('button',{name:'录钟曲',exact:true}).click();await page.locator('.bell-app[data-recording="true"]').waitFor();
+    await playMidi(page,60);await toggle().click();await playMidi(page,64);await toggle().click();await playMidi(page,72);
+    assert.equal(await page.locator('.bell-app').getAttribute('data-recording'),'true');
+    await page.locator('.is-recording').click();await page.getByLabel('曲名',{exact:true}).fill('Notation continuity');await page.getByRole('button',{name:'保存钟曲',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('ymqn:3d:v1:works'))[0].events.map(e=>e.midi)),[60,64,72]);
+    await page.goto(`${base}?lang=zh&score=zhuzhi-ci-recording#play`);await surface.waitFor();await toggle().click();
+    await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.notation==='numbered');
+    assert.equal(await surface.getAttribute('data-notation-key'),'F');assert.equal(await page.locator('.notation-key:visible').first().textContent(),'1=F');
+    const fPlaques=JSON.parse(await surface.getAttribute('data-note-plaques'));
+    assert.ok(fPlaques.some(t=>t.midi===65&&t.text==='1'&&t.octave===0));assert.ok(fPlaques.some(t=>t.midi===71&&t.text==='♯4'));
+    await hit(page,'bell-4-g','right',71);await shot(page,`${engine}-numbered-desktop-f`);
+    assert.equal(requests.filter(heavy).length,0);return {keys:['C','F'],recordedMidi:[60,64,72],audioTailPreserved:true};
+  });
+  await test(browser,engine,'numbered-phone-layouts',async(page,context,requests)=>{
+    const dimensions=[[1440,900],[390,844],[320,568],[844,390],[568,320],[932,430]];
+    for(const lang of ['zh','en'])for(const [width,height] of dimensions){
+      page.__yimingStep=`numbered ${lang} ${width}x${height}`;
+      await page.setViewportSize({width,height});await open(page,'play',lang);
+      const surface=page.locator('.main-performance-surface');await surface.locator('.strike-target').first().waitFor({state:'attached'});
+      await page.waitForFunction(()=>{const surface=document.querySelector('.main-performance-surface'),canvas=surface?.querySelector('.main-bells'),layout=JSON.parse(surface?.dataset.layout||'{}');return canvas&&Math.abs(canvas.getBoundingClientRect().width-layout.width)<1;});
+      const notationToggle=page.locator('.notation-toggle:visible').first();
+      // Same-document #play navigation may preserve the user's last mode.
+      if(await notationToggle.getAttribute('aria-pressed')==='true')await notationToggle.click();
+      await notationToggle.click();
+      await page.waitForFunction(()=>document.querySelector('.main-performance-surface')?.dataset.notation==='numbered');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow');
+      for(const control of await page.locator('.app-header button:visible,.play-layout-controls button:visible').all()){
+        const box=await control.boundingBox();assert.ok(box.x>=-.5&&box.x+box.width<=width+.5,`Visible control fits ${lang} ${width}x${height}`);
+      }
+      const toggle=await page.locator('.notation-toggle:visible').first().boundingBox();assert.ok(toggle.width>=44&&toggle.height>=44);
+      const layout=JSON.parse(await surface.getAttribute('data-layout'));assert.equal(layout.columns,4);assert.deepEqual(layout.issues,[]);
+      await hit(page,`bell-${layout.low}-a`,'right',(layout.low+2)*12);
+      await shot(page,`${engine}-numbered-${lang}-${width}x${height}`);
+    }
+    assert.equal(requests.filter(heavy).length,0);
+  });
   await test(browser,engine,'default-and-audio',async(page,context,requests)=>{
     await open(page);await settled(page);assert.equal(await modelSwitch(page).isChecked(),false);
     assert.equal(requests.filter(heavy).length,0);assert.deepEqual(await page.evaluate(()=>window.__qaContexts),[]);
@@ -166,14 +275,18 @@ async function core(browser,engine){
   await test(browser,engine,'four-bell-focus-and-availability',async(page,context,requests)=>{
     const dimensions=[[1440,900],[390,844],[360,740],[320,568],[844,390],[932,430]];
     for(const [width,height] of dimensions){
+      page.__yimingStep=`four-bell ${width}x${height}`;
       await page.setViewportSize({width,height});await open(page,'play');
       const surface=page.locator('.main-performance-surface');await surface.locator('.strike-target').first().waitFor({state:'attached'});
       await page.locator('.bank-picker select:visible').first().selectOption('4');
-      await page.waitForFunction(()=>JSON.parse(document.querySelector('.main-performance-surface').dataset.layout).low===4);
-      let layout=JSON.parse(await surface.getAttribute('data-layout'));
+      await page.waitForFunction(()=>{const el=document.querySelector('.main-performance-surface'),layout=JSON.parse(el.dataset.layout),rect=el.getBoundingClientRect();return layout.low===4&&Math.abs(layout.width-rect.width)<1&&Math.abs(layout.height-rect.height)<1;});
+      // Read the responsive layout and its targets in one browser frame: a
+      // ResizeObserver can legitimately change the row count between RPCs.
+      const snapshot=await surface.evaluate(el=>({layout:JSON.parse(el.dataset.layout),count:el.querySelectorAll('.strike-target').length,targets:JSON.parse(el.dataset.targets)}));
+      let layout=snapshot.layout;
       assert.equal(layout.columns,4);assert.equal(layout.displayRows,layout.rows);assert.deepEqual(layout.issues,[]);
-      assert.equal(await surface.locator('.strike-target').count(),layout.rows*8);
-      const targets=JSON.parse(await surface.getAttribute('data-targets'));assert.ok(targets.every(t=>t.width>=44&&t.height>=44));
+      assert.equal(snapshot.count,layout.rows*8);
+      assert.ok(snapshot.targets.every(t=>t.width>=44&&t.height>=44));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       for(const button of await page.locator('.app-header button:visible,.play-layout-controls button:visible').all()){
         const box=await button.boundingBox();assert.ok(box.x>=-.5&&box.x+box.width<=width+.5,`Visible toolbar control stays on screen at ${width}x${height}`);

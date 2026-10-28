@@ -23,6 +23,8 @@
 
 数字谱以 **1–7** 表示音阶级数；`1=C` 表示 1 对应 C，`1=F` 表示 1 对应 F。上下点表示八度变化，每个谱音下方的音名对应具体击点。
 
+演奏状态栏的「音名 ⇄ 简谱」可切换钟上音牌和演奏提示。数字标注跟随当前曲谱调号，包括《竹枝词》完整版的 `1=F`。切换保留击区、声音、练习进度和录曲，继续使用原版金边小音牌及钟角悬挂位置。
+
 每音组四口钟，采用以下现代演奏配对。左右钟角发出同一个侧鼓音：
 
 | 正鼓 | 左右侧鼓 |
@@ -44,6 +46,8 @@
 - **完整版**：覆盖所提供的 2 分 33 秒演奏录音，`1=F`；附原音对照、MIDI、MusicXML 和可打印谱页。
 
 完整版是合奏显著击音线的转谱初稿，尚未完成专家逐音听校，也未可靠分离编钟与编磬声部。**＊** 标记待核对击音，参考伴奏同样为转谱估计。编配和第三方曲目涉及独立权利，见[来源与素材说明](docs/credits.md)。
+
+**《烟花易冷 · 谱图选段》**依据提供的简谱正文录入，`1=C`，4/4，77 BPM，含 2 拍弱起与 28 个完整小节，约 89 秒。支持整段示范和逐句跟奏，保留休止、连音与倚音。前奏含当前四钟音组未设置的音，未纳入选段；图片未显示完整结尾与反复终点，因此按主谱线演奏一遍，不标为整曲完整版。
 
 ## 声音、存储与模型边界
 
@@ -73,6 +77,8 @@ node tests/mobile-viewport.mjs
 node tests/practice.mjs
 node tests/workspace.mjs
 node tests/paired-pitches.mjs
+node tests/numbered-notation.mjs
+node tests/yanhua-yi-leng.mjs
 node tests/resource-loading.mjs
 node scripts/build-pages.mjs
 node tests/pages.mjs

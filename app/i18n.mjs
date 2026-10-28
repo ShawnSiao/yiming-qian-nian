@@ -27,7 +27,7 @@ export function tr(parts,...values){
   if(locale==='en'&&key==='{0}拍')return `${values[0]} ${Number(values[0])===1?'beat':'beats'}`;
   if(locale==='en'&&key==='{0} 首本地作品 · 最多保留 30 首')return `${values[0]} saved ${Number(values[0])===1?'recording':'recordings'} · Up to 30`;
   const formatted=pattern.replace(/\{(\d+)\}/g,(_,index)=>String(values[Number(index)]??''));
-  return locale==='en'&&key.startsWith('试听简谱 ')?formatted.replace(', 1 beats',', 1 beat'):formatted;
+  return locale==='en'&&/^(试听简谱 |休止 |延续前音 )/.test(key)?formatted.replace(/\b1 beats\b/g,'1 beat'):formatted;
 }
 export function applyLocale(){
   if(typeof document==='undefined'||!document.documentElement)return;

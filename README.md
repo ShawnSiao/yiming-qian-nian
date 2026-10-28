@@ -23,6 +23,8 @@ English pitch labels use scientific pitch notation: **C4** is middle C. Chinese 
 
 Numbered scores use scale degrees **1–7**. `1=C` makes 1 equal C; `1=F` makes it F. Dots above or below move a note by an octave. The pitch name beneath each score note identifies the corresponding bell.
 
+Use **Pitches ⇄ Numbers** in the performance toolbar to switch the bell plaques and playing prompts. Numbered labels follow the selected score's key, including `1=F` for the full Zhuzhi Ci draft. Switching keeps the current striking areas, sound, practice position and recording intact. The original gold-edged plaques remain on the bell and its lower corners.
+
 Each register has four bells with this modern performance mapping. Both lower corners sound the same side note:
 
 | Bell center | Either side |
@@ -44,6 +46,8 @@ The library includes introductory exercises, familiar melodies and two versions 
 - **Full:** a draft transcription covering the supplied 2:33 recording, `1=F`, with reference audio, MIDI, MusicXML and a printable score page.
 
 The full version follows prominent strikes in an ensemble. It has not received expert note-by-note verification or reliable separation of bronze bells and stone chimes. **＊** marks notes requiring review. Its reference accompaniment is also a transcription estimate. Arrangements and third-party music have separate rights considerations; see [credits and asset notes](docs/credits.md).
+
+**Yan Hua Yi Leng · Sheet excerpt** follows the user-supplied numbered score at `1=C`, 4/4, 77 BPM: a two-beat pickup and 28 full bars, about 89 seconds. It supports a full excerpt demonstration and phrase practice, retaining rests, ties and grace notes. The introduction contains pitches outside the four-bell instrument and is not included; the cropped image has no final cadence or repeat ending, so this excerpt plays the main staff once. It is not presented as the complete composition.
 
 ## Sound, storage and model limits
 
@@ -73,6 +77,8 @@ node tests/mobile-viewport.mjs
 node tests/practice.mjs
 node tests/workspace.mjs
 node tests/paired-pitches.mjs
+node tests/numbered-notation.mjs
+node tests/yanhua-yi-leng.mjs
 node tests/resource-loading.mjs
 node scripts/build-pages.mjs
 node tests/pages.mjs
