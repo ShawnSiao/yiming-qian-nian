@@ -1,10 +1,10 @@
 {
-  "version": "r29.1.0",
-  "name": "Numbered notation and sheet excerpts",
+  "version": "r29.1.1",
+  "name": "Qing Tian score restoration",
   "languages": [
     "en",
     "zh-CN"
   ],
-  "source": "R29 four-bell instrument, numbered labels, supplied sheet excerpt, lightweight home and R26 model",
+  "source": "R29 four-bell instrument, C/F/G numbered labels, supplied Qing Tian and Yan Hua Yi Leng scores, lightweight home and R26 model",
   "model": "single-bell.glb"
 }

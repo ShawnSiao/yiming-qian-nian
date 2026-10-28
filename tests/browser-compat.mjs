@@ -75,6 +75,78 @@ async function test(browser,engine,name,run,options={}){
   finally{await context.close();await writeFile(resolve(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
 }
 async function core(browser,engine){
+  await test(browser,engine,'qing-tian-sheet-and-original-pitches',async(page,context,requests)=>{
+    await open(page,'library');const row=page.locator('.song-list [data-song-id="licensed-qing-tian"]');
+    assert.equal(await row.count(),1);await row.locator('.song-info').click();
+    assert.equal(await row.locator('.song-preview').isDisabled(),false);assert.equal(await row.locator('.song-practice').isDisabled(),false);
+    assert.match(await page.locator('.library-score .score-meta').textContent(),/1=G · 67 BPM/);
+    assert.equal(await page.locator('.library-bars .library-bar').count(),69);
+    assert.match(await page.locator('.library-bar').first().textContent(),/6\u0323/,'Preview keeps the lower octave dots');
+    assert.match(await page.locator('.library-score .score-scope').textContent(),/X 无固定音高/);
+    await shot(page,`${engine}-qing-tian-library`);
+    await page.locator('.library-bar').nth(8).click();
+    await page.locator('.score-aside-actions .primary').click();await page.locator('.bell-app[data-phase="wait"]').waitFor();
+    for(const [i,midi] of [74,74,67,67,69,71].entries()){await playMidi(page,midi);await page.locator(`.bell-app[data-step="${i+1}"]`).waitFor();}
+    await page.locator('.bell-app[data-phase="done"]').waitFor();
+    await page.locator('.measure-select[aria-label="第 29 小节"]').click();
+    assert.equal(await page.locator('.score-aside-actions .primary').isDisabled(),true);
+    assert.equal(await page.locator('.score-aside-actions .secondary').isDisabled(),false);
+    await shot(page,`${engine}-qing-tian-listen-only-bar`);
+    await page.evaluate(async()=>{
+      const {BellAudio}=await import('./audio.mjs'),{PerformanceScene}=await import('./performance.mjs');
+      const a=BellAudio.prototype.strike,s=PerformanceScene.prototype.strike;
+      window.__qingAudio=[];window.__qingVisual=[];
+      BellAudio.prototype.strike=function(midi,...args){window.__qingAudio.push(midi);return a.call(this,midi,...args);};
+      PerformanceScene.prototype.strike=function(bell,region,...args){window.__qingVisual.push(bell.data[region==='center'?'centerMidi':'sideMidi']);return s.call(this,bell,region,...args);};
+    });
+    await page.locator('.score-aside-actions .secondary').click();await page.locator('.bell-app[data-phase="listen"]').waitFor();
+    await page.waitForFunction(()=>window.__qingAudio.length>=7);await page.locator('.bell-app[data-phase="free"]').waitFor();
+    const notes=await page.evaluate(()=>({audio:window.__qingAudio,visual:window.__qingVisual}));
+    assert.deepEqual(notes.audio,[71,73,75,71,73,75,78]);assert.deepEqual(notes.visual,[71,71],'Accidentals sound without a false natural-bell highlight');
+    const rendered=await renderedPitches(page,[54,66,73,75,78]);
+    if(rendered.available)for(const n of rendered.notes)assert.equal(n.measuredMidi,n.midi,'Synthesized audio retains the missing accidentals');
+    await page.locator('.measure-select[aria-label="第 42 小节"]').click();
+    assert.equal(await page.locator('.phrase-strip .score-note.is-rest').count(),4);
+    assert.equal(await page.locator('.score-aside-actions .primary').isDisabled(),true);assert.equal(await page.locator('.score-aside-actions .secondary').isDisabled(),true);
+    await page.locator('.measure-select[aria-label="第 69 小节"]').click();
+    assert.equal(await page.getByRole('button',{name:'无固定音高节奏 0.25 拍',exact:true}).count(),6,'X appears in both score readers without an invented pitch');
+    await page.locator('.measure-select[aria-label="第 9 小节"]').click();
+    await page.locator('.notation-toggle:visible').first().click();assert.equal(await page.locator('.notation-key:visible').first().textContent(),'1=G');
+    for(const [width,height] of [[390,844],[844,390],[320,640]]){
+      await page.setViewportSize({width,height});await page.waitForTimeout(200);
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      const visible=await page.locator('.main-performance-surface').evaluate(e=>({rows:JSON.parse(e.dataset.layout).rows,bells:JSON.parse(e.dataset.contacts).length}));assert.equal(visible.bells,visible.rows*4);
+      await shot(page,`${engine}-qing-tian-${width}x${height}`);
+    }
+    await page.getByRole('button',{name:'切换为英文',exact:true}).click();await nav(page,1);
+    await row.locator('.song-info').click();assert.match(await row.locator('.song-info strong').textContent(),/Qing Tian/);
+    assert.match(await row.locator('.song-inline-preview').textContent(),/G tonic, 4\/4, 67 BPM/);
+    assert.equal(await page.locator('.song-list [data-song-id^="zhuzhi-ci"]').count(),2);assert.equal(await page.locator('.song-list [data-song-id="yanhua-yi-leng"]').count(),1);
+    assert.equal(requests.filter(heavy).length,0);
+    return {bars:69,attacks:503,originalPhrase:notes,rendered,dimensions:[[390,844],[844,390],[320,640]]};
+  });
+  if(engine==='chromium'&&process.env.YIMING_LONG_PLAYBACK==='1')await test(browser,engine,'qing-tian-full-listen',async(page,context,requests)=>{
+    await open(page,'library');
+    await page.evaluate(async()=>{
+      const {PerformanceScene}=await import('./performance.mjs'),{BellAudio}=await import('./audio.mjs');
+      const s=PerformanceScene.prototype.strikeMidi,a=BellAudio.prototype.strike;window.__qingDispatch=[];window.__qingAudio=[];
+      PerformanceScene.prototype.strikeMidi=function(midi,...args){window.__qingDispatch.push(midi);return s.call(this,midi,...args);};
+      BellAudio.prototype.strike=function(midi,...args){window.__qingAudio.push(midi);return a.call(this,midi,...args);};
+    });
+    await page.locator('.song-list [data-song-id="licensed-qing-tian"] .song-preview').click();
+    await page.locator('.bell-app[data-phase="listen"]').waitFor();
+    await page.waitForFunction(()=>window.__qingDispatch.length>0);
+    await page.locator('.notation-toggle:visible').first().click();
+    assert.equal(await page.locator('.bell-app').getAttribute('data-phase'),'listen');
+    await page.locator('.bell-app[data-phase="free"]').waitFor({timeout:260000});
+    const result=await page.evaluate(async()=>{const {qingTian:s}=await import('./data/qing-tian.mjs');return {duration:s.durationMs,expected:s.events.map(n=>n.midi),actual:window.__qingDispatch,audio:window.__qingAudio,audioState:document.querySelector('.main-performance-surface').dataset.audioState,started:Number(document.querySelector('.main-performance-surface').dataset.audioNotesStarted)};});
+    assert.equal(result.expected.length,503);assert.deepEqual(result.actual,result.expected);assert.deepEqual(result.audio,result.expected);
+    assert.equal(result.started,503);assert.equal(result.audioState,'running');
+    assert.match(await page.locator('.phrase-count').textContent(),/69 \/ 69/);
+    assert.match(await page.locator('.phrase-status strong').textContent(),/试听结束/);
+    assert.equal(requests.filter(heavy).length,0);await shot(page,`${engine}-qing-tian-full-listen-completed`);
+    return {...result,realTimePlayback:true};
+  });
   await test(browser,engine,'yanhua-library-and-practice',async(page,context,requests)=>{
     await open(page,'library');const row=page.locator('.song-list [data-song-id="yanhua-yi-leng"]');
     await row.locator('.song-info').click();assert.equal(await row.getAttribute('data-playable'),'true');
@@ -305,12 +377,12 @@ async function core(browser,engine){
     }
     await nav(page,1);const missing=page.locator('.song-list .song-row[data-playable="false"]');assert.equal(await missing.count(),1);
     assert.match(await missing.locator('.song-info strong').textContent(),/晴天/);
-    assert.ok(await missing.locator('.song-preview').isDisabled());assert.ok(await missing.locator('.song-practice').isDisabled());
-    await missing.locator('.song-info').click();assert.ok(await page.locator('.library-score-actions .primary').isDisabled());
+    assert.equal(await missing.locator('.song-preview').isDisabled(),false);assert.equal(await missing.locator('.song-practice').isDisabled(),false);
+    await missing.locator('.song-info').click();assert.equal(await page.locator('.library-score-actions .primary').isDisabled(),false);
     await shot(page,`${engine}-four-missing-pitches-zh`);
     await page.getByRole('button',{name:'切换为英文',exact:true}).click();
-    assert.match(await missing.locator('.pitch-availability').textContent(),/Missing pitches: F♯4/);
-    assert.ok(await page.locator('.library-score-actions .primary').isDisabled());
+    assert.match(await missing.locator('.pitch-availability').textContent(),/Some bars are listen-only/);
+    assert.equal(await page.locator('.library-score-actions .primary').isDisabled(),false);
     assert.equal(await page.locator('.song-list [data-song-id^="zhuzhi-ci"]').count(),2);
     assert.equal(requests.filter(heavy).length,0);return {dimensions,fourBellsPerRow:true,missingPitchScore:'Qing Tian'};
   });

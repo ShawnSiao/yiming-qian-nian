@@ -1,5 +1,16 @@
 // Chinese source messages are stable IDs; user-written recording titles are never translated.
 export default {
+  "按两页简谱录入，1=G，4/4，67 BPM。含前奏、69 小节旋律谱及末段 X 节奏参考；试听保留原音高。":"Transcribed from the two supplied pages: G tonic, 4/4, 67 BPM. Includes the introduction, 69 melodic bars and the closing X rhythm reference. Previews keep the original pitches.",
+  "四钟音组未设置 F♯、C♯、D♯ 击点：可听原音，含这些音的小节暂不能跟敲。末段 X 无固定音高，仅展示节奏参考，旋律试听在 X 段前结束。":"The four-bell layout has no F♯, C♯ or D♯ targets. Original-pitch previews are available; bars with these pitches cannot be practiced on this rack. X marks have no fixed pitch, so the melodic preview ends before that closing section.",
+  "周杰伦词曲 · 孙世彦制谱":"Words and music by Jay Chou · Score by Sun Shiyan",
+  "末段 X 节奏参考":"Closing X rhythm reference",
+  "X 没有固定音高，不补写旋律；以下保留原谱分组，不参与钟声试听与跟敲。":"X has no fixed pitch. These groups retain the printed rhythm reference and are excluded from pitched playback and bell practice.",
+  "无固定音高节奏 {0} 拍":"Unpitched rhythm for {0} beats",
+  "本小节有钟架未设置的音，可听原音或切换小节练习。":"This bar includes pitches missing from the rack. Listen at the original pitch or choose another bar to practice.",
+  "本小节为延音、休止或无固定音高节奏。":"This bar contains held notes, rests or unpitched rhythm.",
+  "{0} · 原谱音高，当前钟架无击点。":"{0} · Original score pitch; no target on this rack.",
+  "可听原音 · 部分小节仅试听":"Original-pitch preview · Some bars are listen-only",
+  "仅试听的音：{0}":"Listen-only pitches: {0}",
   "烟花易冷 · 谱图选段": "Yan Hua Yi Leng · Sheet excerpt",
   "1=C，4/4，77 BPM。含 2 拍弱起与 28 小节正文；前奏和图片外结尾未纳入。": "C tonic, 4/4, 77 BPM. A two-beat pickup and 28 full bars from the supplied vocal score; the introduction and unpictured ending are not included.",
   "正文选段，未含前奏。谱图未显示反复终点与完整结尾，本版按主谱线演奏一遍。": "Vocal excerpt without the introduction. The image has no repeat ending or final cadence, so the main staff is played once.",
