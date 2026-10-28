@@ -10,13 +10,14 @@ import {clampSplitFraction} from './score-workspace.mjs';
 import {pitchLabel,pitchFitsBank,isPairedPitch,registerLabel,unsupportedPitches} from './paired-instrument.mjs';
 import {displayPitch} from './pitch-display.mjs';
 import {yanhuaYiLeng} from './data/yanhua-yi-leng.mjs';
+import {qingTian} from './data/qing-tian.mjs';
 import {measuresFor,practiceBank,practiceHit,phraseEvents} from './practice-model.mjs';
 import {Home2DScene} from './home-2d-scene.mjs';
 import {ModelResource,mountModel} from './model-resource.mjs';
 import {Header,Icon,HomeTitle,HomeGuide,HomeStudy,ModelModeControl,ScoreAside,PhraseStrip,BankPicker,NotationControl,PitchMark,LibraryPage,ObservePanel,WorksPage} from './components.mjs';
 
 const {createElement:h,useState,useEffect,useRef}=window.React;
-const songs=(window.YMQNSongs||[]).concat(yanhuaYiLeng);
+const songs=(window.YMQNSongs||[]).map(s=>s.id===qingTian.id?qingTian:s).concat(yanhuaYiLeng);
 const defaultSong=songs.find(s=>s.id==='zhuzhi-ci')||songs[0];
 const deepView=location.hash.slice(1);
 const simulated=new URLSearchParams(location.search).get('safe');
@@ -52,7 +53,7 @@ function App(){
   workList.current=works;
   if(!audio.current)audio.current=new BellAudio();if(!transport.current)transport.current=new Transport();
   const song=songs.find(x=>x.id===state.songId)||defaultSong,measures=measuresFor(song),measure=measures[state.bar]||measures[0];
-  const playable=unsupportedPitches(song.events).length===0;
+  const playable=measure.notes.length>0&&unsupportedPitches(measure.notes).length===0;
   const active=['wait','listen','timed'].includes(state.phase),target=active?measure.notes[state.index]:null;
   const notationKey=state.phase==='work'?'C':song.scoreKey||'C';
   const displayName=midi=>displayPitch(midi,state.notation,notationKey).label;
@@ -99,16 +100,14 @@ function App(){
   }
   function changeView(view){if(view===live.current.view)return;stop();finishRecording();setSettings(false);update({view,phase:'free',paused:false,index:0,feedback:t('先听一遍，再试着敲一句。'),workTitle:''});location.hash=view;}
   function selectSong(next,bar=0,phase='free'){
-    stop();finishRecording();const m=measuresFor(next)[bar],bank=practiceBank(m.notes,layout.rows||2);
-    update({songId:next.id,bar,index:0,phase,paused:false,low:bank.low,feedback:phase==='wait'?pitchFeedback`先找简谱 ${String(m.notes[0].degree)} · ${m.notes[0].midi}`:t('轻点谱音可以先听，找到后再敲钟。')});
-  }
-  function unavailableScore(next){
-    const missing=unsupportedPitches(next.events);if(!missing.length)return false;
-    notify(tr`待补音：${missing.map(pitchLabel).join('、')}。四钟音组暂不支持整曲试听与跟奏。`);return true;
+    stop();finishRecording();const m=measuresFor(next)[bar],bank=m.notes.length?practiceBank(m.notes,layout.rows||2):{low:live.current.low};
+    update({songId:next.id,bar,index:0,phase,paused:false,low:bank.low,feedback:phase==='wait'?pitchFeedback`先找简谱 ${String(m.notes[0].degree)} · ${m.notes[0].midi}`:t(!m.notes.length?'本小节为延音、休止或无固定音高节奏。':unsupportedPitches(m.notes).length?'本小节有钟架未设置的音，可听原音或切换小节练习。':'轻点谱音可以先听，找到后再敲钟。')});
   }
   function start(next=song,bar=state.bar){
-    if(unavailableScore(next))return;
     const m=measuresFor(next)[bar],bank=practiceBank(m.notes,layout.rows||2);
+    if(!m.notes.length||unsupportedPitches(m.notes).length){
+      selectSong(next,bar);update({view:'play',feedback:t(m.notes.length?'本小节有钟架未设置的音，可听原音或切换小节练习。':'本小节为延音、休止或无固定音高节奏。')});location.hash='play';return;
+    }
     if(m.notes.some(n=>!isPairedPitch(n.midi))||!bank.fits&&state.mode==='timed'){
       selectSong(next,bar);update({view:'play',feedback:t('这一小节超出当前击点范围。可先试听，或切换为等待式分段练习。')});return;
     }
@@ -141,28 +140,32 @@ function App(){
     }else if(current.phase==='free'&&!record.current)update({feedback:pitchFeedback`${event.midi} · ${event.region==='center'?t('中央正鼓'):t('侧鼓')} · 余韵渐歇`});
   }
   function listenPhrase(){
-    if(unavailableScore(song))return;
+    if(!measure.notes.length)return;
     stop();finishRecording();audio.current.unlock().catch(()=>{});update({phase:'listen',paused:false,index:0,feedback:t('正在示范这一句，留意亮起的击点。')});
     const events=phraseEvents(measure.notes,song.bpm);
-    playStage(events,{beatMs:60000/song.bpm,onNote:(e,i)=>{fitPlaybackNote(e.midi,measure.notes);engine.current?.strikeMidi(e.midi,'playback');update({index:i});},onEnd:()=>update({phase:'free',index:0,feedback:t('听过这一句了，试着跟着敲。')})});
+    playStage(events,{beatMs:60000/song.bpm,onNote:(e,i)=>{fitPlaybackNote(e.midi,measure.notes);engine.current?.strikeMidi(e.midi,'playback');update({index:i,feedback:isPairedPitch(e.midi)?t('正在示范这一句，留意亮起的击点。'):pitchFeedback`${e.midi} · 原谱音高，当前钟架无击点。`});},onEnd:()=>update({phase:'free',index:0,feedback:t('听过这一句了，试着跟着敲。')})});
   }
   function fitPlaybackNote(midi,notes){
+    if(!isPairedPitch(midi))return;
     const scene=engine.current,rows=scene?.layout?.rows||2,low=scene?.layout?.low??live.current.low;
     if(pitchFitsBank(midi,low,rows))return;
     const whole=practiceBank(notes,rows),bank=whole.fits?whole:practiceBank([{midi}],rows);
     scene?.setOptions({startOctave:bank.low});update({low:bank.low});
   }
   function listenSong(next){
-    if(unavailableScore(next))return;
     stop();finishRecording();audio.current.unlock().catch(()=>{});const ms=measuresFor(next),bank=practiceBank(ms[0].notes,layout.rows||2);
     update({view:'play',songId:next.id,bar:0,index:0,low:bank.low,phase:'listen',paused:false,feedback:next.transcriptionStatus?t('正在试听转谱初稿。＊处仍待听校。'):t('正在示范，留意钟上的击点。')});location.hash='play';
     const events=scoreEvents(next);
-    playStage(events,{beatMs:60000/next.bpm,endTime:next.durationMs,accompaniment:state.accompaniment?scoreEvents(next,1,(next.listenEvents||[]).filter(e=>e.velocity<.45)):[],onAccompaniment:e=>audio.current.strike(e.midi,0,e.velocity).catch(()=>{}),onNote:(e,i)=>{
+    playStage(events,{beatMs:60000/next.bpm,endTime:next.durationMs,accompaniment:state.accompaniment?scoreEvents(next,1,(next.listenEvents||[]).filter(e=>e.velocity<.45)):[],onAccompaniment:e=>audio.current.strike(e.midi,0,e.velocity).catch(()=>{}),onTick:({elapsed})=>{
+      if(!next.jianpuBars||elapsed<0)return;
+      const beat=elapsed*next.bpm/60000,bar=ms.findIndex(m=>beat>=m.startBeat&&beat<m.startBeat+m.beats);
+      if(bar>=0&&live.current.bar!==bar)update({bar,index:0,...(!ms[bar].notes.length?{feedback:t('本小节为延音、休止或无固定音高节奏。')}:{})});
+    },onNote:(e,i)=>{
       const original=next.events[i],bar=ms.findIndex(m=>m.notes.some(n=>n.midi===original.midi&&Math.abs(n.beat-original.beat)<.001));
       const currentBar=Math.max(0,bar),at=ms[currentBar].notes.findIndex(n=>n.midi===original.midi&&Math.abs(n.beat-original.beat)<.001),current=live.current;
       if(current.bar!==currentBar)update({bar:currentBar});
       fitPlaybackNote(e.midi,ms[currentBar].notes);
-      engine.current?.strikeMidi(e.midi,'playback',e.velocity);update({index:Math.max(0,at)});
+      engine.current?.strikeMidi(e.midi,'playback',e.velocity);update({index:Math.max(0,at),feedback:isPairedPitch(e.midi)?t('正在示范，留意钟上的击点。'):pitchFeedback`${e.midi} · 原谱音高，当前钟架无击点。`});
     },onEnd:()=>update({phase:'free',index:0,feedback:t('试听结束。选一小句，慢慢敲一遍。')})});
   }
   function runTimed(next,bar){
@@ -270,7 +273,7 @@ function App(){
   useEffect(()=>()=>{modelResource.current.cancel();transport.current.stop();audio.current.dispose();clearTimeout(noticeTimer.current);},[]);
 
   const contact=target&&engine.current?.layout?performanceContact(engine.current.layout,target.midi):null;
-  const needsBank=target&&!pitchFitsBank(target.midi,layout.low,layout.rows),targetBank=target?practiceBank([target],layout.rows).low:state.low;
+  const needsBank=target&&isPairedPitch(target.midi)&&!pitchFitsBank(target.midi,layout.low,layout.rows),targetBank=target?practiceBank([target],layout.rows).low:state.low;
   const stageTag=contact?{left:Math.max(52,Math.min((engine.current.layout.width||500)-52,contact.point.x)),top:Math.max(20,contact.point.y-35)}:null;
   function selectPart(id){setPart(id);setCut(false);viewer.current?.setCutaway(false);viewer.current?.selectPart(id,true);}
   function observeTheme(key){setTheme(key);if(key==='cavity')selectPart('cavity');else if(key==='relief')selectPart('zhuan');else selectPart('overview');}

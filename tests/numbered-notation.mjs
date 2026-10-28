@@ -6,10 +6,10 @@ import {performanceLayout,bellNoteTags,findNoteTagHit,performanceLayoutChanged} 
 
 for(const locale of ['zh','en']){
   setLocale(locale);
-  for(let midi=48;midi<=96;midi++)for(const key of ['C','F']){
+  for(let midi=48;midi<=96;midi++)for(const key of ['C','F','G']){
     assert.equal(displayPitch(midi,'pitch',key).text,pitchLabel(midi));
     const n=displayPitch(midi,'numbered',key),digit=Number(n.text.slice(-1));
-    const restored=(key==='F'?65:60)+[0,2,4,5,7,9,11][digit-1]+(n.text.startsWith('♯')?1:0)+n.octave*12;
+    const restored=({C:60,F:65,G:67})[key]+[0,2,4,5,7,9,11][digit-1]+(n.text.startsWith('♯')?1:0)+n.octave*12;
     assert.equal(restored,midi,'Changing notation never transposes or folds a pitch');
   }
 }
@@ -26,7 +26,7 @@ assert.equal(displayPitch(71,'numbered','F').text,'♯4','F-key B stays B, writt
 assert.equal(displayPitch(-1,'numbered').text,'—');
 for(const [width,height,portrait] of [[276,270,true],[296,338,true],[366,566,true],[544,203,false],[820,273,false],[1396,640,false]]){
   const options={mobile:width<900,portrait},original=performanceLayout(width,height,options);
-  for(const key of ['C','F']){
+  for(const key of ['C','F','G']){
     const numbered=performanceLayout(width,height,{...options,notation:'numbered',notationKey:key});
     assert.equal(performanceLayoutChanged(original,numbered),false);
     assert.deepEqual(numbered.bells,original.bells,'Notation keeps bodies, MIDI, strike targets and contact positions unchanged');
@@ -39,4 +39,4 @@ for(const [width,height,portrait] of [[276,270,true],[296,338,true],[366,566,tru
     }
   }
 }
-console.log('Numbered notation: C/F keys, octave dots, bilingual names, unchanged MIDI and mobile plaque hit mapping passed.');
+console.log('Numbered notation: C/F/G keys, octave dots, bilingual names, unchanged MIDI and mobile plaque hit mapping passed.');
