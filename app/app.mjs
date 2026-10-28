@@ -8,13 +8,15 @@ import {initialView} from './home-interaction.mjs';
 import {appendStrike,recordedWork,workTitle,renameWork} from './recording-model.mjs';
 import {clampSplitFraction} from './score-workspace.mjs';
 import {pitchLabel,pitchFitsBank,isPairedPitch,registerLabel,unsupportedPitches} from './paired-instrument.mjs';
+import {displayPitch} from './pitch-display.mjs';
+import {yanhuaYiLeng} from './data/yanhua-yi-leng.mjs';
 import {measuresFor,practiceBank,practiceHit,phraseEvents} from './practice-model.mjs';
 import {Home2DScene} from './home-2d-scene.mjs';
 import {ModelResource,mountModel} from './model-resource.mjs';
-import {Header,Icon,HomeTitle,HomeGuide,HomeStudy,ModelModeControl,ScoreAside,PhraseStrip,BankPicker,LibraryPage,ObservePanel,WorksPage} from './components.mjs';
+import {Header,Icon,HomeTitle,HomeGuide,HomeStudy,ModelModeControl,ScoreAside,PhraseStrip,BankPicker,NotationControl,PitchMark,LibraryPage,ObservePanel,WorksPage} from './components.mjs';
 
 const {createElement:h,useState,useEffect,useRef}=window.React;
-const songs=window.YMQNSongs||[];
+const songs=(window.YMQNSongs||[]).concat(yanhuaYiLeng);
 const defaultSong=songs.find(s=>s.id==='zhuzhi-ci')||songs[0];
 const deepView=location.hash.slice(1);
 const simulated=new URLSearchParams(location.search).get('safe');
@@ -23,7 +25,10 @@ if(simulated){
   if([3,4].includes(values.length)&&values.every(Number.isFinite))sides.forEach((side,i)=>document.documentElement.style.setProperty(`--safe-${side}`,`${Math.max(0,Math.min(96,values[i]))}px`));
 }
 const linkedSong=new URLSearchParams(location.search).get('score');
-const initial={view:['home','play','library','observe','works'].includes(deepView)?deepView:initialView(location.search),songId:songs.some(s=>s.id===linkedSong)?linkedSong:defaultSong.id,bar:0,index:0,phase:'free',mode:'wait',paused:false,feedback:t('先听一遍，再试着敲一句。'),low:4,labels:true,muted:false,workTitle:'',accompaniment:true,rate:.72};
+const initial={view:['home','play','library','observe','works'].includes(deepView)?deepView:initialView(location.search),songId:songs.some(s=>s.id===linkedSong)?linkedSong:defaultSong.id,bar:0,index:0,phase:'free',mode:'wait',paused:false,feedback:t('先听一遍，再试着敲一句。'),low:4,labels:true,notation:'pitch',muted:false,workTitle:'',accompaniment:true,rate:.72};
+// Keep MIDI in pitch-aware feedback so changing notation redraws the current
+// message too, without resetting practice, recording or an audio tail.
+const pitchFeedback=(parts,...values)=>({parts,values});
 
 function App(){
   const [language,setLanguage]=useState(getLocale);
@@ -49,6 +54,9 @@ function App(){
   const song=songs.find(x=>x.id===state.songId)||defaultSong,measures=measuresFor(song),measure=measures[state.bar]||measures[0];
   const playable=unsupportedPitches(song.events).length===0;
   const active=['wait','listen','timed'].includes(state.phase),target=active?measure.notes[state.index]:null;
+  const notationKey=state.phase==='work'?'C':song.scoreKey||'C';
+  const displayName=midi=>displayPitch(midi,state.notation,notationKey).label;
+  const feedback=typeof state.feedback==='string'?state.feedback:tr(state.feedback.parts,...state.feedback.values.map(value=>typeof value==='number'?displayName(value):value));
 
   function changeLanguage(){
     if(hint.current)hint.current.hidden=true;
@@ -92,7 +100,7 @@ function App(){
   function changeView(view){if(view===live.current.view)return;stop();finishRecording();setSettings(false);update({view,phase:'free',paused:false,index:0,feedback:t('先听一遍，再试着敲一句。'),workTitle:''});location.hash=view;}
   function selectSong(next,bar=0,phase='free'){
     stop();finishRecording();const m=measuresFor(next)[bar],bank=practiceBank(m.notes,layout.rows||2);
-    update({songId:next.id,bar,index:0,phase,paused:false,low:bank.low,feedback:phase==='wait'?tr`先找简谱 ${m.notes[0].degree} · ${pitchLabel(m.notes[0].midi)}`:t('轻点谱音可以先听，找到后再敲钟。')});
+    update({songId:next.id,bar,index:0,phase,paused:false,low:bank.low,feedback:phase==='wait'?pitchFeedback`先找简谱 ${String(m.notes[0].degree)} · ${m.notes[0].midi}`:t('轻点谱音可以先听，找到后再敲钟。')});
   }
   function unavailableScore(next){
     const missing=unsupportedPitches(next.events);if(!missing.length)return false;
@@ -126,11 +134,11 @@ function App(){
       const currentSong=songs.find(x=>x.id===current.songId),notes=measuresFor(currentSong)[current.bar].notes;
       const result=practiceHit({index:current.index,notes,phase:current.phase,paused:current.paused},event.midi);
       if(current.paused)return;
-      if(result.accepted)update({index:result.index,phase:result.done?'done':'wait',feedback:result.done?t('这一句敲完了。可以继续，也可以再练一次。'):tr`敲对了，接着找 ${pitchLabel(notes[result.index].midi)}。`});
-      else update({feedback:tr`刚才是 ${pitchLabel(event.midi)}，再试试亮起的 ${pitchLabel(notes[current.index].midi)}。`});
+      if(result.accepted)update({index:result.index,phase:result.done?'done':'wait',feedback:result.done?t('这一句敲完了。可以继续，也可以再练一次。'):pitchFeedback`敲对了，接着找 ${notes[result.index].midi}。`});
+      else update({feedback:pitchFeedback`刚才是 ${event.midi}，再试试亮起的 ${notes[current.index].midi}。`});
     }else if(current.phase==='timed'&&!current.paused){
       const correct=transport.current.judge(event.midi,performance.now());update({feedback:correct?t('对上拍点了。'):t('再听听拍点，继续下一音。')});
-    }else if(current.phase==='free'&&!record.current)update({feedback:tr`${pitchLabel(event.midi)} · ${event.region==='center'?t('中央正鼓'):t('侧鼓')} · 余韵渐歇`});
+    }else if(current.phase==='free'&&!record.current)update({feedback:pitchFeedback`${event.midi} · ${event.region==='center'?t('中央正鼓'):t('侧鼓')} · 余韵渐歇`});
   }
   function listenPhrase(){
     if(unavailableScore(song))return;
@@ -160,7 +168,7 @@ function App(){
   function runTimed(next,bar){
     const notes=measuresFor(next)[bar].notes,rate=state.rate,events=phraseEvents(notes,next.bpm*rate,next.bpm);
     audio.current.unlock().catch(()=>{});
-    playStage(events,{follow:true,beatMs:60000/next.bpm/rate,onTarget:(e,i)=>{engine.current?.setCue(200);update({index:i,feedback:tr`跟着拍点，敲 ${pitchLabel(e.midi)}。`});},onTick:tick=>{if(tick.countIn)update({feedback:tr`预备 ${tick.countIn} · 听拍点，准备落槌。`});},onEnd:()=>update({phase:'done',index:notes.length,feedback:t('这一句已结束。可以再练一次，或继续下一句。')})});
+    playStage(events,{follow:true,beatMs:60000/next.bpm/rate,onTarget:(e,i)=>{engine.current?.setCue(200);update({index:i,feedback:pitchFeedback`跟着拍点，敲 ${e.midi}。`});},onTick:tick=>{if(tick.countIn)update({feedback:tr`预备 ${tick.countIn} · 听拍点，准备落槌。`});},onEnd:()=>update({phase:'done',index:notes.length,feedback:t('这一句已结束。可以再练一次，或继续下一句。')})});
   }
   function audition(midi){audio.current.strike(midi).catch(()=>update({feedback:t('声音尚未开启，请再轻点一次。')}));}
   function homeTone(region){if(homeReady&&viewer.current?.mesh)viewer.current.strike(region);else if(poster.current)poster.current.strike(region);else{audition(region==='center'?60:64);homeStrike({region,midi:region==='center'?60:64});}}
@@ -238,13 +246,14 @@ function App(){
       if(!info.layout)return;const next={rows:info.layout.rows,low:info.layout.low,count:info.bellCount,key:`${info.layout.width}:${info.layout.height}:${info.layout.portrait}`};
       setLayout(old=>old.rows===next.rows&&old.low===next.low&&old.count===next.count&&old.key===next.key?old:next);
     }});engine.current=scene;
-    scene.setOptions({startOctave:live.current.low,choice:focused?'single':'auto',labels:live.current.labels,muted:live.current.muted,active:true,noteStyle});
+    scene.setOptions({startOctave:live.current.low,choice:focused?'single':'auto',labels:live.current.labels,muted:live.current.muted,active:true,noteStyle,notation:state.notation,notationKey});
     scene.ready.catch(()=>update({feedback:t('钟体素材暂未就绪，可以刷新页面后重试。')}));
     scene.ready.then(()=>{const run=pendingPlayback.current;pendingPlayback.current=null;run?.(scene);}).catch(()=>{});
     return()=>{scene.dispose();engine.current=null;};
   },[state.view]);
   useEffect(()=>{engine.current?.setOptions({startOctave:state.low,choice:focused?'single':'auto',labels:state.labels,muted:state.muted,focusTarget:active});engine.current?.setTarget(target?.midi??null);engine.current?.setCue(350);},[state.low,state.labels,state.muted,state.phase,state.index,state.bar,state.paused,layout.count,focused]);
   useEffect(()=>{engine.current?.setOptions({noteStyle,locale:language});viewer.current?.refreshLanguage();poster.current?.refreshLanguage();},[noteStyle,language]);
+  useEffect(()=>{engine.current?.setOptions({notation:state.notation,notationKey});},[state.notation,notationKey]);
   useEffect(()=>{const d=homeMoreDialog.current;if(homeMore&&!d.open)d.showModal();else if(!homeMore&&d.open)d.close();},[homeMore]);
   useEffect(()=>{audio.current.setMuted(state.muted);},[state.muted]);
   useEffect(()=>activateSoundOnInteraction(audio.current,document,()=>!live.current.muted&&!document.hidden),[]);
@@ -268,11 +277,11 @@ function App(){
   function observeView(key){if(key==='front')viewer.current?.reset();if(key==='side')viewer.current?.viewSide();if(key==='cavity')observeTheme('cavity');}
   const modelControl=h(ModelModeControl,{enabled:modelEnabled,status:modelState,onChange:setModelEnabled,onRetry:()=>{setModelEnabled(true);setModelAttempt(value=>value+1);}});
   const bankDisabled=recording||['listen','timed','work'].includes(state.phase);
-  const focusControl=h('button',{className:'text-button focus-register','aria-pressed':focused,disabled:bankDisabled,onClick:()=>{interrupt('resize');setFocused(value=>!value);}},focused?t('展开音组'):t('聚焦一排'));
-  const playControls=h(window.React.Fragment,null,h(BankPicker,{low:layout.low,rows:layout.rows,onBank:low=>update({low}),disabled:bankDisabled}),focusControl);
+  const focusControl=h('button',{className:'text-button focus-register','aria-label':t(focused?'展开音组':'聚焦一排'),'aria-pressed':focused,disabled:bankDisabled,onClick:()=>{interrupt('resize');setFocused(value=>!value);}},h('span',{className:'focus-label'},t(focused?'展开音组':'聚焦一排')),h('span',{className:'focus-short-label','aria-hidden':true},t(focused?'展开':'聚焦')));
+  const playControls=h(window.React.Fragment,null,h(NotationControl,{notation:state.notation,scoreKey:notationKey,onChange:notation=>update({notation})}),h(BankPicker,{low:layout.low,rows:layout.rows,onBank:low=>update({low}),disabled:bankDisabled}),focusControl);
 
   return h('main',{className:`bell-app view-${state.view}`,'data-view':state.view,'data-phase':state.phase,'data-paused':state.paused,'data-step':state.index,'data-recording':recording,'data-work-count':works.length},
-    h(Header,{view:state.view,playControls,modelControl:['home','observe'].includes(state.view)?modelControl:null,onLanguage:changeLanguage,onView:changeView,onMore:()=>setHomeMore(true),onSettings:()=>{interrupt('settings');setSettings(true);},context:state.workTitle||`${t(song.title)} · ${state.bar+1}/${measures.length}`,feedback:recording?tr`录制中 · ${formatTime(elapsed)} · ${recordCount} 次落槌`:state.paused?t('已暂停 · 继续时接着敲'):state.feedback}),
+    h(Header,{view:state.view,playControls,modelControl:['home','observe'].includes(state.view)?modelControl:null,onLanguage:changeLanguage,onView:changeView,onMore:()=>setHomeMore(true),onSettings:()=>{interrupt('settings');setSettings(true);},context:state.workTitle||`${t(song.title)} · ${state.bar+1}/${measures.length}`,feedback:recording?tr`录制中 · ${formatTime(elapsed)} · ${recordCount} 次落槌`:state.paused?t('已暂停 · 继续时接着敲'):feedback}),
     state.view==='home'&&h('section',{className:'home-screen','data-screen-label':t('双音入门首页')},
       h('div',{className:'home-hall','aria-hidden':true}),h('div',{className:'home-layout'},h(HomeTitle),
         h('div',{className:'home-object','data-ready':homeReady,'data-model-state':modelState,'data-render-mode':homeReady?'3d':'2d'},h('div',{className:'home-2d-host',ref:posterHost}),h('div',{className:'home-canvas-host',ref:homeHost,'data-visible':homeReady})),
@@ -280,11 +289,11 @@ function App(){
         h(HomeStudy,{theme,onTheme:setTheme,onZoom:n=>viewer.current?.zoomBy(n),onReset:()=>viewer.current?.reset(),onObserve:()=>{setPart('overview');changeView('observe');},ready:homeReady,arrivalAudio,onArrival:replayArrival,volume,onVolume:setVolume})),h('span',{className:'home-hit-hint',ref:hint,hidden:true,'aria-hidden':true})),
     state.view==='play'&&h('section',{className:'play-page','data-screen-label':t('看谱与逐句跟奏')},
       h('div',{className:'play-topline'},h('div',null,h('h1',null,state.workTitle||t(song.title)),h('p',null,state.phase==='work'?t('本地作品回放'):`${t(measure.label)} · ${recording?t('录制中'):state.phase==='listen'?(state.paused?t('试听已暂停'):t('试听中')):state.phase==='wait'?t('等敲对再继续'):state.phase==='timed'?t('跟着节拍'):t('自由演奏')}${song.transcriptionStatus?t(' · 转谱初稿'):''}`)),h('div',{className:'play-layout-controls'},playControls)),
-      h('div',{className:`play-workspace score-${scoreSide}${!showScore||state.phase==='work'?' score-hidden':''}`,ref:workspace,style:{'--bell-fr':`${splitFraction}fr`,'--score-fr':`${1-splitFraction}fr`}},h('section',{className:'play-stage','aria-label':t('编钟演奏区')},h('div',{className:'performance-host',ref:playHost}),target&&stageTag&&h('span',{className:'target-caption',style:stageTag,'aria-hidden':true},`${target.accidental||''}${target.degree} · ${pitchLabel(target.midi)}`),
-        needsBank&&h('div',{className:'bank-shift-prompt'},h('span',null,tr`下一个音 ${pitchLabel(target.midi)} 在另一音组`),h('button',{className:'secondary',onClick:()=>update({low:targetBank})},tr`切换至${registerLabel(targetBank)}`)),h('span',{className:'stage-summary'},tr`${layout.count} 口 · 每音组四口`)),
+      h('div',{className:`play-workspace score-${scoreSide}${!showScore||state.phase==='work'?' score-hidden':''}`,ref:workspace,style:{'--bell-fr':`${splitFraction}fr`,'--score-fr':`${1-splitFraction}fr`}},h('section',{className:'play-stage','aria-label':t('编钟演奏区')},h('div',{className:'performance-host',ref:playHost}),target&&stageTag&&h('span',{className:'target-caption',style:stageTag,'aria-hidden':true},state.notation==='numbered'?h(PitchMark,{midi:target.midi,notation:state.notation,scoreKey:notationKey}):`${target.accidental||''}${target.degree} · ${pitchLabel(target.midi)}`),
+        needsBank&&h('div',{className:'bank-shift-prompt'},h('span',null,tr`下一个音 ${displayName(target.midi)} 在另一音组`),h('button',{className:'secondary',onClick:()=>update({low:targetBank})},tr`切换至${registerLabel(targetBank)}`)),h('span',{className:'stage-summary'},tr`${layout.count} 口 · 每音组四口`)),
         showScore&&state.phase!=='work'&&h('div',{className:'pane-splitter',role:'separator',tabIndex:recording?-1:0,'aria-label':t('调整钟区与曲谱宽度'),'aria-orientation':'vertical','aria-valuemin':56,'aria-valuemax':86,'aria-valuenow':Math.round(splitFraction*100),'aria-disabled':recording,onPointerDown:splitStart,onPointerMove:splitMove,onPointerUp:splitEnd,onPointerCancel:splitEnd,onLostPointerCapture:splitEnd,onKeyDown:splitKey}),
         showScore&&state.phase!=='work'&&h(ScoreAside,{song,measures,bar:state.bar,index:state.index,active,playable,onBar:setBar,onPractice:()=>start(),onListen:listenPhrase,onAudition:audition})),
-      h(PhraseStrip,{measure,bar:state.bar,count:measures.length,index:state.index,phase:state.phase,paused:state.paused,feedback:state.feedback,playable,onPrev:()=>setBar(state.bar-1),onNext:()=>state.phase==='done'?nextBar():setBar(state.bar+1),onListen:listenPhrase,onPractice:()=>start(),onPause:togglePause,onStop:()=>{stop();update({phase:'free',paused:false,workTitle:'',feedback:t('已结束，当前乐句已保留。')});},onRetry:()=>start(),onAudition:audition,muted:state.muted,onMute:()=>update({muted:!state.muted}),recording,elapsed,recordCount,onRecord:toggleRecord,playback:state.phase==='work'?state.workTitle:null})),
+      h(PhraseStrip,{measure,bar:state.bar,count:measures.length,index:state.index,phase:state.phase,paused:state.paused,feedback,playable,onPrev:()=>setBar(state.bar-1),onNext:()=>state.phase==='done'?nextBar():setBar(state.bar+1),onListen:listenPhrase,onPractice:()=>start(),onPause:togglePause,onStop:()=>{stop();update({phase:'free',paused:false,workTitle:'',feedback:t('已结束，当前乐句已保留。')});},onRetry:()=>start(),onAudition:audition,muted:state.muted,onMute:()=>update({muted:!state.muted}),recording,elapsed,recordCount,onRecord:toggleRecord,playback:state.phase==='work'?state.workTitle:null})),
     state.view==='library'&&h(LibraryPage,{songs,selected:song,filter,onFilter:setFilter,onSelect:next=>selectSong(next),onStart:start,onListen:listenSong,onAudition:audition,onSource:stop,onBar:(next,bar)=>{selectSong(next,bar);update({view:'play'});location.hash='play';}}),
     state.view==='works'&&h(WorksPage,{works,onPlay:playWork,onRecord:()=>changeView('play'),onRename:work=>setWorkEdit({kind:'rename',work,value:work.title,error:''}),onSave:()=>notify(saveWorks(works)?t('本地作品已保存。'):t('保存失败，请检查浏览器存储空间。'))}),
     state.view==='observe'&&h('section',{className:'observe-page home-screen','data-screen-label':t('单钟结构观赏')},

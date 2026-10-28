@@ -11,15 +11,20 @@ export function pitchNotation(midi,key='C'){
 export function scoreMeasures(song){
   if(!song)return [];
   const key=song.scoreKey||'C',tonic=key==='F'?65:60;
-  if(song.jianpuBars)return song.jianpuBars.map((bar,index)=>{
-    let offset=0;
-    const notes=bar.map(n=>{
-      const beat=index*4+(n.offset??offset);offset+=n.duration;
-      const midi=n.midi??tonic+C_MAJOR[n.degree-1]+(n.octave||0)*12;
-      return {...n,midi,beat};
+  if(song.jianpuBars){
+    let start=0;
+    return song.jianpuBars.map((bar,index)=>{
+      let offset=0;const notes=[],startBeat=start,beats=index===0&&song.pickupBeats?song.pickupBeats:4;start+=beats;
+      for(const n of bar){
+        const onset=n.offset??offset;offset=onset+n.duration;
+        const graces=n.graceNotes||[],graceBeat=.125;
+        graces.forEach((g,i)=>notes.push({...g,midi:tonic+C_MAJOR[g.degree-1]+(g.octave||0)*12,beat:startBeat+onset+i*graceBeat,offset:onset+i*graceBeat,duration:graceBeat,velocity:.65,grace:true}));
+        const delay=graces.length*graceBeat,midi=n.degree===0?null:n.midi??tonic+C_MAJOR[n.degree-1]+(n.octave||0)*12;
+        notes.push({...n,midi,beat:startBeat+onset+delay,offset:onset+delay,duration:n.duration-delay,...(delay?{notatedDuration:n.duration}:{} )});
+      }
+      return {index,label:`第 ${index+1} 小节`,notes,startBeat,beats};
     });
-    return {index,label:`第 ${index+1} 小节`,notes};
-  });
+  }
   const measures=[];
   song.events.forEach((e,index)=>{
     const group=Math.floor(index/8);

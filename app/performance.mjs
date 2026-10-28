@@ -7,6 +7,7 @@ import {STRIKE_FEEDBACK_MS,malletFeedback} from './strike-feedback.mjs';
 import {registerLabel,registerMark} from './paired-instrument.mjs';
 import {loadBellImage} from './image-resource.mjs';
 import {drawBellPlaceholder} from './bell-placeholder.mjs';
+import {displayPitch} from './pitch-display.mjs';
 
 const IMAGE_KEYS=['top','middle','bottom','mallet'];
 const GOLD='#c6aa68',RICE='#eee2c7';
@@ -48,14 +49,21 @@ export function drawNotePlaque(ctx,tag,highlighted=false){
   else{metal.addColorStop(0,'#29342d');metal.addColorStop(.52,'#202b25');metal.addColorStop(1,'#111815');ctx.shadowColor='rgba(0,0,0,.64)';ctx.shadowBlur=2;}
   trace(0);ctx.fillStyle=metal;ctx.fill();ctx.strokeStyle=highlighted?'rgba(230,205,134,.86)':'rgba(117,100,59,.78)';ctx.lineWidth=.8;ctx.stroke();ctx.shadowBlur=0;
   trace(2);ctx.strokeStyle=highlighted?'rgba(72,49,19,.62)':'rgba(178,151,82,.28)';ctx.lineWidth=.55;ctx.stroke();
-  ctx.fillStyle=highlighted?'#24180b':'#ded0a6';ctx.globalAlpha=1;ctx.fillText(text,x,y+.25);ctx.restore();
+  ctx.fillStyle=highlighted?'#24180b':'#ded0a6';ctx.globalAlpha=1;
+  const octave=tag.octave||0,digitY=y+.25+(octave>0?2:octave<0?-2:0);
+  ctx.fillText(text,x,digitY);
+  if(octave){
+    const dotX=x+(text.startsWith('♯')?ctx.measureText('♯').width/2:0),dotY=digitY+(octave>0?-fontSize*.60-2:fontSize*.55+1.2),count=Math.abs(octave);
+    for(let i=0;i<count;i++){ctx.beginPath();ctx.arc(dotX+(i-(count-1)/2)*3.4,dotY,1.15,0,Math.PI*2);ctx.fill();}
+  }
+  ctx.restore();
 }
 
 export class PerformanceScene {
   constructor(host,{audio,onMeasure=()=>{},onStrike=()=>{},onMessage=()=>{},onInterrupt=()=>{}}={}) {
     this.host=host;this.audio=audio||new BellAudio();this.ownsAudio=!audio;
     Object.assign(this,{onMeasure,onStrike,onMessage,onInterrupt});
-    this.options={active:true,choice:'auto',startOctave:4,labels:true,muted:false,diagnostics:false,noteStyle:'classic',locale:getLocale()};
+    this.options={active:true,choice:'auto',startOctave:4,labels:true,muted:false,diagnostics:false,noteStyle:'classic',locale:getLocale(),notation:'pitch',notationKey:'C'};
     this.history=[];this.effects=[];this.pointers=new Map();this.frames=0;this.raf=0;this.lastFrame=0;this.disposed=false;
     this.images={};this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.surface=document.createElement('div');this.surface.className='scene-surface main-performance-surface';
@@ -118,7 +126,13 @@ export class PerformanceScene {
     this.surface.classList.toggle('show-diagnostics',this.options.diagnostics);
     this.surface.classList.toggle('hide-labels',!this.options.labels);
     if(['choice','startOctave','noteStyle','locale'].some(k=>before[k]!==this.options[k])){this.cancelInput(true);this.resize(true);}
-    else this.invalidate();
+    else{
+      if(this.layout&&(before.notation!==this.options.notation||before.notationKey!==this.options.notationKey)){
+        this.layout.notation=this.options.notation;this.layout.notationKey=this.options.notationKey;
+        this.refreshNoteLabels();this.publish(true);
+      }
+      this.invalidate();
+    }
   }
   resize(force=false){
     if(this.disposed)return;const rect=this.host.getBoundingClientRect();if(rect.width<1||rect.height<1)return;
@@ -148,7 +162,6 @@ export class PerformanceScene {
       button.dataset.bell=bell.data.id;button.dataset.region=target.region;button.dataset.midi=String(bell.data[target.region==='center'?'centerMidi':'sideMidi']);
       button.dataset.bellStyle=bell.imageKey;
       button.style.left=`${target.x}px`;button.style.top=`${target.y}px`;
-      button.setAttribute('aria-label',tr`${bell.data.centerName} 编钟，${target.region==='center'?t('正鼓 ')+bell.data.centerName:t('右侧鼓 ')+bell.data.sideName}`);
       button.addEventListener('pointerdown',e=>{
         if(!this.canPlay()||e.button!==0||this.pointers.has(e.pointerId))return;
         e.preventDefault();this.capture(e,button);
@@ -160,6 +173,13 @@ export class PerformanceScene {
       button.addEventListener('click',e=>{if(e.detail===0&&this.canPlay())this.strike(bell,target.region,'accessibility');});
       const measure=document.createElement('span');measure.className='target-measure';measure.textContent='44';button.append(measure);
       this.buttons.set(target.key,button);this.overlay.append(button);
+    }
+    this.refreshNoteLabels();
+  }
+  refreshNoteLabels(){
+    const name=midi=>displayPitch(midi,this.options.notation,this.options.notationKey).description;
+    for(const bell of this.layout.bells)for(const target of bell.targets){
+      this.buttons.get(target.key)?.setAttribute('aria-label',tr`${name(bell.data.centerMidi)} 编钟，${target.region==='center'?t('正鼓 ')+name(bell.data.centerMidi):t('右侧鼓 ')+name(bell.data.sideMidi)}`);
     }
   }
   // Adapted from main@20b716d assets/app.js drawRack, preserving its red
@@ -229,7 +249,7 @@ export class PerformanceScene {
   }
   publish(layoutChanged=false){
     if(!this.surface)return;
-    Object.assign(this.surface.dataset,{eventCount:String(this.history.length),audioNotesStarted:String(this.audio.count),audioState:this.audio.context?.state||'not-started',activePointers:String(this.pointers.size),lastMidi:String(this.history.at(-1)?.midi||''),lastRegion:this.history.at(-1)?.region||'',plaqueStyle:`r27-${this.options.noteStyle}:${this.options.locale}`,labelsVisible:String(this.options.labels)});
+    Object.assign(this.surface.dataset,{eventCount:String(this.history.length),audioNotesStarted:String(this.audio.count),audioState:this.audio.context?.state||'not-started',activePointers:String(this.pointers.size),lastMidi:String(this.history.at(-1)?.midi||''),lastRegion:this.history.at(-1)?.region||'',plaqueStyle:`r27-${this.options.noteStyle}:${this.options.locale}`,labelsVisible:String(this.options.labels),notation:this.options.notation,notationKey:this.options.notationKey});
     const impact=this.effects.at(-1);if(impact)Object.assign(this.surface.dataset,{malletHeight:String(malletFeedback(impact.bell,0,this.layout.mobile).height),impactX:String(impact.point.x),impactY:String(impact.point.y),feedbackDuration:String(STRIKE_FEEDBACK_MS)});
     if(layoutChanged&&this.layout){this.surface.dataset.layout=JSON.stringify({...this.layout,bells:undefined,issues:this.issues||[]});this.surface.dataset.targets=JSON.stringify(this.targets);this.surface.dataset.bodies=JSON.stringify(this.bodies);this.surface.dataset.contacts=JSON.stringify(this.layout.bells.map(b=>({id:b.data.id,...b.points})));this.surface.dataset.notePlaques=JSON.stringify(this.layout.bells.flatMap(b=>bellNoteTags(this.layout,b).map(t=>({...t,midi:t.region==='center'?b.data.centerMidi:b.data.sideMidi}))));}
   }

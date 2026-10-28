@@ -1,10 +1,10 @@
 {
-  "version": "r29.0.0",
-  "name": "Four bells per register",
+  "version": "r29.1.0",
+  "name": "Numbered notation and sheet excerpts",
   "languages": [
     "en",
     "zh-CN"
   ],
-  "source": "Approved R29 four-bell prototype, lightweight home and R26 model",
+  "source": "R29 four-bell instrument, numbered labels, supplied sheet excerpt, lightweight home and R26 model",
   "model": "single-bell.glb"
 }
