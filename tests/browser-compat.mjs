@@ -10,7 +10,7 @@ let server;if(!process.env.YIMING_BASE_URL){
   server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:'4320'},stdio:['ignore','pipe','pipe']});
   await new Promise((done,reject)=>{server.stdout.once('data',done);server.once('error',reject);server.once('exit',code=>reject(new Error(`Preview exited ${code}`)));});
 }
-const report={date:new Date().toISOString(),base,results:[],engines:[],limits:['No physical iPhone, Android phone or the originally failing remote Edge computer is controlled by this test.']};
+const report={date:new Date().toISOString(),base,results:[],engines:[],limits:['No physical iPad, iPhone, Android phone or the originally failing remote Edge computer is controlled by this test.']};
 const selectedCases=process.env.YIMING_CASES?.split(',');if(selectedCases)report.selectedCases=selectedCases;
 const heavy=url=>/\/(?:models\/.*\.glb|vendor\/(?:three|OrbitControls|GLTFLoader)|home-bell-scene\.mjs|geometry\.mjs|lighting\.mjs|section-cap\.mjs)/.test(url);
 const modelSwitch=page=>page.getByRole('switch',{name:/3D/});
@@ -314,6 +314,45 @@ async function core(browser,engine){
     await page.waitForTimeout(150);layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([4,8,12].includes(layout.rows*4));assert.equal(layout.columns,4);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await shot(page,engine+'-phone-landscape');assert.equal(requests.filter(heavy).length,0);
   });
+  await test(browser,engine,'tablet-portrait-three-registers',async(page,context,requests)=>{
+    await open(page,'play');
+    const surface=page.locator('.main-performance-surface');
+    const rack=async rows=>{
+      // The root height is published on an animation frame before the rack's
+      // ResizeObserver runs. Wait for both after an orientation change.
+      await page.waitForFunction(({width,height})=>{
+        const el=document.querySelector('.main-performance-surface');
+        if(!el?.dataset.layout||innerWidth!==width||innerHeight!==height)return false;
+        const visibleHeight=Math.floor(Math.min(innerHeight,window.visualViewport?.height||innerHeight));
+        if(parseFloat(document.documentElement.style.getPropertyValue('--viewport-height'))!==visibleHeight)return false;
+        const layout=JSON.parse(el.dataset.layout),host=el.parentElement.getBoundingClientRect();
+        return layout.width===Math.floor(host.width)&&layout.height===Math.floor(host.height);
+      },page.viewportSize());
+      const state=await surface.evaluate(el=>({layout:JSON.parse(el.dataset.layout),contacts:JSON.parse(el.dataset.contacts),targets:JSON.parse(el.dataset.targets),registers:el.querySelectorAll('.register-label').length,overflow:document.documentElement.scrollWidth>innerWidth}));
+      assert.equal(state.layout.rows,rows,`Register count at stage ${state.layout.width}×${state.layout.height}`);
+      assert.equal(state.registers,rows);assert.equal(state.layout.columns,4);assert.equal(state.contacts.length,rows*4);
+      assert.deepEqual(state.layout.issues,[]);assert.ok(state.targets.every(t=>t.width===44&&t.height===44));assert.equal(state.overflow,false);
+      return state;
+    };
+    assert.equal(await page.evaluate(()=>matchMedia('(pointer: coarse)').matches),true);
+    const portrait=await rack(3);
+    assert.deepEqual(portrait.layout.octaves,[6,5,4]);
+    for(const [octave,midi] of [[4,60],[5,72],[6,84]]){
+      const center=portrait.contacts.find(c=>c.id===`bell-${octave}-c`).center,bounds=await page.locator('.main-bells').boundingBox();
+      await page.touchscreen.tap(bounds.x+center.x,bounds.y+center.y);
+      await page.waitForFunction(expected=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(expected),midi);
+    }
+    await shot(page,`${engine}-tablet-portrait-three-registers`);
+    await page.locator('.focus-register:visible').tap();await rack(1);
+    await page.locator('.focus-register:visible').tap();await rack(3);
+    await page.setViewportSize({width:820,height:865});
+    const cropped=await rack(3);
+    assert.ok(cropped.layout.width>cropped.layout.height,'A portrait viewport may contain a wider-than-tall rack');
+    await page.setViewportSize({width:1024,height:768});await rack(2);
+    await page.setViewportSize({width:1024,height:1366});const large=await rack(3);
+    assert.equal(requests.filter(heavy).length,0);
+    return {stages:[portrait,cropped,large].map(({layout:l})=>({width:l.width,height:l.height,rows:l.rows})),tappedMidis:[60,72,84],landscapeRows:2,focusedRows:1};
+  },{viewport:{width:768,height:1024},hasTouch:true,isMobile:engine!=='firefox',reducedMotion:'reduce'});
   await test(browser,engine,'header-model-switch',async(page,context,requests)=>{
     for(const [width,height,view] of [[1440,900,'home'],[390,844,'home'],[320,568,'home'],[320,568,'observe'],[740,360,'observe']]){
       await page.setViewportSize({width,height});await open(page,view);await page.locator('.app-header .model-switch').waitFor();
