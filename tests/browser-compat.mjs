@@ -314,7 +314,7 @@ async function core(browser,engine){
     await page.waitForTimeout(150);layout=JSON.parse(await surface.getAttribute('data-layout'));assert.ok([4,8,12].includes(layout.rows*4));assert.equal(layout.columns,4);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await shot(page,engine+'-phone-landscape');assert.equal(requests.filter(heavy).length,0);
   });
-  await test(browser,engine,'tablet-portrait-three-registers',async(page,context,requests)=>{
+  await test(browser,engine,'tablet-three-registers',async(page,context,requests)=>{
     await open(page,'play');
     const surface=page.locator('.main-performance-surface');
     const rack=async rows=>{
@@ -335,23 +335,33 @@ async function core(browser,engine){
       return state;
     };
     assert.equal(await page.evaluate(()=>matchMedia('(pointer: coarse)').matches),true);
-    const portrait=await rack(3);
-    assert.deepEqual(portrait.layout.octaves,[6,5,4]);
-    for(const [octave,midi] of [[4,60],[5,72],[6,84]]){
-      const center=portrait.contacts.find(c=>c.id===`bell-${octave}-c`).center,bounds=await page.locator('.main-bells').boundingBox();
-      await page.touchscreen.tap(bounds.x+center.x,bounds.y+center.y);
-      await page.waitForFunction(expected=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(expected),midi);
-    }
+    const tapRegisters=async state=>{
+      assert.deepEqual(state.layout.octaves,[6,5,4]);
+      for(const [octave,midi] of [[4,60],[5,72],[6,84]]){
+        const center=state.contacts.find(c=>c.id===`bell-${octave}-c`).center,bounds=await page.locator('.main-bells').boundingBox();
+        await page.touchscreen.tap(bounds.x+center.x,bounds.y+center.y);
+        await page.waitForFunction(expected=>document.querySelector('.main-performance-surface')?.dataset.lastMidi===String(expected),midi);
+      }
+    };
+    const portrait=await rack(3);await tapRegisters(portrait);
     await shot(page,`${engine}-tablet-portrait-three-registers`);
     await page.locator('.focus-register:visible').tap();await rack(1);
     await page.locator('.focus-register:visible').tap();await rack(3);
     await page.setViewportSize({width:820,height:865});
     const cropped=await rack(3);
     assert.ok(cropped.layout.width>cropped.layout.height,'A portrait viewport may contain a wider-than-tall rack');
-    await page.setViewportSize({width:1024,height:768});await rack(2);
+    await page.setViewportSize({width:1024,height:768});const landscape=await rack(3);await tapRegisters(landscape);
+    await page.setViewportSize({width:1133,height:660});
+    await page.goto(`${base}?lang=zh&safe=24,0,0,20#play`);
+    const shortLandscape=await rack(3);await tapRegisters(shortLandscape);
+    await page.locator('.focus-register:visible').tap();await rack(1);
+    await page.locator('.focus-register:visible').tap();await rack(3);
+    await shot(page,`${engine}-tablet-short-landscape-three-registers`);
+    await page.setViewportSize({width:1366,height:930});const wide=await rack(3);
+    await page.setViewportSize({width:932,height:430});await rack(2);
     await page.setViewportSize({width:1024,height:1366});const large=await rack(3);
     assert.equal(requests.filter(heavy).length,0);
-    return {stages:[portrait,cropped,large].map(({layout:l})=>({width:l.width,height:l.height,rows:l.rows})),tappedMidis:[60,72,84],landscapeRows:2,focusedRows:1};
+    return {stages:[portrait,cropped,landscape,shortLandscape,wide,large].map(({layout:l})=>({width:l.width,height:l.height,rows:l.rows})),tappedMidis:[60,72,84],phoneLandscapeRows:2,focusedRows:1};
   },{viewport:{width:768,height:1024},hasTouch:true,isMobile:engine!=='firefox',reducedMotion:'reduce'});
   await test(browser,engine,'header-model-switch',async(page,context,requests)=>{
     for(const [width,height,view] of [[1440,900,'home'],[390,844,'home'],[320,568,'home'],[320,568,'observe'],[740,360,'observe']]){

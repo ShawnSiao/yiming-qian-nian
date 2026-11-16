@@ -38,7 +38,7 @@ for(const [w,h,portrait] of [[296,338,true],[351,437,true],[366,566,true],[544,2
     for(const t of tags.filter(t=>t.region!=='center'))check(Math.abs(t.anchorY-(b.y+b.height*.96))<.01&&t.y>=t.anchorY,'side plaques hang below the two mouth corners instead of floating beside the body');
   }
 }
-for(const [height,portrait,choice,rows] of [[746,true,'auto',3],[470,true,'auto',3],[469,true,'auto',2],[247,true,'auto',1],[746,true,'single',1],[746,false,'auto',2]]){
+for(const [height,portrait,choice,rows] of [[746,true,'auto',3],[470,true,'auto',3],[469,true,'auto',2],[247,true,'auto',1],[746,true,'single',1],[501,false,'auto',3],[313,false,'auto',2]]){
   const layout=performanceLayout(744,height,{choice,mobile:true,portrait});
   check(layout.rows===rows,`Touch rack respects viewport orientation, height and focus (${height}, ${portrait}, ${choice})`);
 }

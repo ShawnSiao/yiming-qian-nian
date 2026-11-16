@@ -12,11 +12,9 @@ const BELL_ASPECT={top:300/633,middle:320/577,bottom:340/524};
 // Main's full bell silhouettes, not cropped 3D meshes. Sizes are display
 // compensation for touch; this is not a measured reconstruction of the rack.
 export function performanceLayout(width,height,{choice='auto',startOctave=4,mobile=false,portrait:portraitViewport,noteStyle='classic',notation='pitch',notationKey='C'}={}) {
-  const viewportIsPortrait=typeof portraitViewport==='boolean'?portraitViewport:height>width;
-  // The narrow portrait geometry is for phones, but tall portrait tablets
-  // should also get the full rack, even when their pointer is coarse.
-  const portrait=width<600&&viewportIsPortrait;
-  const threeRows=(viewportIsPortrait||!mobile)&&height>=(portrait?450:470);
+  const portrait=width<600&&(typeof portraitViewport==='boolean'?portraitViewport:height>width);
+  // A tall enough rack fits three rows with either touch or mouse input.
+  const threeRows=height>=(portrait?450:470);
   const desired=choice==='single'?1:choice==='full'||threeRows?3:2;
   const gap=portrait?8:12;
   const count=BELL_PAIRS.length;
